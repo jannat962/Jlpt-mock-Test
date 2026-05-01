@@ -19,7 +19,7 @@ function App() {
   useEffect(() => {
     const pingBackend = async () => {
       try {
-        await fetch(`${API_URL.replace('/api', '')}/health`);
+        await fetch(`${API_URL}/health`);
         console.log("Backend is awake!");
       } catch (e) {
         console.warn("Backend is still waking up...");
@@ -56,7 +56,7 @@ function App() {
       const sessionRes = await fetch(`${API_URL}/tests/start/${testId}?user_id=1`, { method: 'POST' });
       if (!sessionRes.ok) {
         const errorData = await sessionRes.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Failed to start session. Is the backend running and user seeded?");
+        throw new Error(errorData.detail || "Database Error: User ID 1 not found. Ensure database is seeded.");
       }
       const sessionData = await sessionRes.json();
       setSession(sessionData);

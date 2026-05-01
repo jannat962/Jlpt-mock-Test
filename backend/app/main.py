@@ -2,13 +2,42 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from . import models
-from .database import engine
+from .database import engine, SessionLocal
 from .routers import exam
+from .models import User, Question
 
 # Auto-create all tables on startup
 models.Base.metadata.create_all(bind=engine)
 
+def auto_seed():
+    db = SessionLocal()
+    try:
+        # Check if user exists
+        if not db.query(User).filter(User.id == 1).first():
+            print("🌱 Auto-seeding: Creating test user...")
+            test_user = User(
+                id=1, name="Test User", email="test@example.com", 
+                password_hash="test123", readiness_score=0.0
+            )
+            db.add(test_user)
+            db.commit()
+        
+        # Check if any questions exist
+        if db.query(Question).count() == 0:
+            print("🌱 Auto-seeding: No questions found. Please run seed scripts manually or via CLI.")
+            # Note: We don't full-seed here to keep startup fast, 
+            # but having the user fixed the "Start Session" error.
+            
+    except Exception as e:
+        print(f"⚠️ Auto-seed failed: {e}")
+    finally:
+        db.close()
+
 app = FastAPI(title="JLPT N4 Mock Test API", version="1.0.0")
+
+@app.on_event("startup")
+async def startup_event():
+    auto_seed()
 
 # Configure CORS — allow localhost for dev and Vercel for production
 origins = [
