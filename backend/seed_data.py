@@ -114,7 +114,7 @@ def seed():
         # Section 1: Grammar / Particle
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=11,
             type="Grammar",
             question_text="兄は日本で働いています。" + " この「で」は何を表しますか？",
@@ -123,7 +123,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=12,
             type="Grammar",
             question_text="兄は日本のトヨタに勤めています。" + " この「に」は何を表しますか？",
@@ -132,7 +132,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=13,
             type="Grammar",
             question_text="ぶどうからワインを作ります。" + " この「から」は何を示しますか？",
@@ -141,7 +141,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=14,
             type="Grammar",
             question_text="１日に３回、この薬を飲んでいます。" + " この「に」は何を表しますか？",
@@ -150,7 +150,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=15,
             type="Grammar",
             question_text="この子ではうるさいですが、外ではおとなしいです。" + " この「では」はどんな意味ですか？",
@@ -159,7 +159,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=16,
             type="Grammar",
             question_text="たんじょう日に父からも母からもプレゼントをもらいました。" + " この「も」はどれですか？",
@@ -168,7 +168,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=17,
             type="Grammar",
             question_text="このプリントを１枚ずつ配ってください。" + " この「ずつ」はどんな意味？",
@@ -177,7 +177,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=18,
             type="Grammar",
             question_text="学校まで２時間もかかります。" + " この「も」はどんなニュアンスですか？",
@@ -186,7 +186,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=19,
             type="Grammar",
             question_text="この机は木でできています。" + " この「で」は何を示しますか？",
@@ -195,7 +195,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=1,
+            section=0,
             number=20,
             type="Grammar",
             question_text="富士山は日本でいちばん高い山です。" + " この「で」は何を表しますか？",
@@ -206,7 +206,7 @@ def seed():
         # Section 2: Short Story / Listening
         Question(
             test_id=1,
-            section=2,
+            section=1,
             number=21,
             type="Reading",
             question_text=(
@@ -224,7 +224,7 @@ def seed():
         ),
         Question(
             test_id=1,
-            section=2,
+            section=1,
             number=22,
             type="Reading",
             question_text=(

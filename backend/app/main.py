@@ -14,13 +14,17 @@ app = FastAPI(title="JLPT N4 Mock Test API", version="1.0.0")
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://*.vercel.app",
+    "https://jlpt-platform.vercel.app",
+    "https://jlpt-platform-git-main-jannat962s-projects.vercel.app", # Example preview URL
     os.getenv("FRONTEND_URL", ""),
 ]
 
+# Add a more permissive check for Vercel preview branches if needed
+# Note: Wildcards with allow_credentials=True are strictly regulated by browsers
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Keep open for now; tighten after deploy
+    allow_origins=origins,  # Use predefined origins to allow credentials securely
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,7 +34,7 @@ app.add_middleware(
 def read_root():
     return {"message": "Welcome to the JLPT N4 API"}
 
-@app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {"status": "healthy"}
 

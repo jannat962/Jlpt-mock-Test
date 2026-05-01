@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+// In development, Vite proxy or explicit URL handles this. 
+// In production on Vercel, the /api prefix is rewritten to Render.
 
 function App() {
   const [view, setView] = useState('landing'); // 'landing', 'exam', 'result'
@@ -12,7 +13,20 @@ function App() {
   const [session, setSession] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(7200); // Default to 120 minutes in seconds
+
+  // Wake up the backend on load
+  useEffect(() => {
+    const pingBackend = async () => {
+      try {
+        await fetch(`${API_URL.replace('/api', '')}/health`);
+        console.log("Backend is awake!");
+      } catch (e) {
+        console.warn("Backend is still waking up...");
+      }
+    };
+    pingBackend();
+  }, []);
 
   // Timer logic
   useEffect(() => {
@@ -35,24 +49,32 @@ function App() {
 
 
   // Start the test
-  const startTest = async () => {
+  const startTest = async (testId) => {
     setLoading(true);
     try {
       // 1. Create a session (User ID 1 is placeholder)
-      const sessionRes = await fetch(`${API_URL}/tests/start/1?user_id=1`, { method: 'POST' });
+      const sessionRes = await fetch(`${API_URL}/tests/start/${testId}?user_id=1`, { method: 'POST' });
+      if (!sessionRes.ok) {
+        const errorData = await sessionRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to start session. Is the backend running and user seeded?");
+      }
       const sessionData = await sessionRes.json();
       setSession(sessionData);
 
-      // 2. Get questions for Test 1
-      const questionsRes = await fetch(`${API_URL}/tests/1/questions`);
+      // 2. Get questions for Test
+      const questionsRes = await fetch(`${API_URL}/tests/${testId}/questions`);
+      if (!questionsRes.ok) {
+        const errorData = await questionsRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to load questions.");
+      }
       const questionsData = await questionsRes.json();
       setQuestions(questionsData);
-      setTimeLeft(600); // 10 minutes
+      setTimeLeft(7200); // 120 minutes for the full test
       setView('exam');
 
     } catch (error) {
       console.error("Failed to start test:", error);
-      alert("Error connecting to server. Make sure the backend is running!");
+      alert(`Connection Error: ${error.message}\n\nPlease ensure the backend at ${API_URL} is reachable.`);
     } finally {
       setLoading(false);
     }
@@ -63,7 +85,7 @@ function App() {
     const existingIndex = newAnswers.findIndex(a => a.question_id === questionId);
 
     if (existingIndex > -1) {
-      newAnswers[existingIndex].selected_index = selectedIndex;
+      newAnswers[existingIndex] = { ...newAnswers[existingIndex], selected_index: selectedIndex };
     } else {
       newAnswers.push({ question_id: questionId, selected_index: selectedIndex });
     }
@@ -116,93 +138,36 @@ function App() {
   const [examineeName, setExamineeName] = useState('');
 
   if (view === 'landing') {
+    const mockTests = Array.from({ length: 12 }, (_, i) => i + 1);
+
     return (
-      <div className="landing-container">
-        <div className="booklet-cover">
-          <header className="cover-header">
-            <div className="corner-left">Language Knowledge <span style={{ fontSize: '0.8rem' }}>(Vocabulary)</span></div>
-            <div className="corner-right" style={{ fontSize: '1.5rem' }}>もんだいようし</div>
-          </header>
+      <div className="dashboard-container">
+        <header className="dashboard-header">
+          <div className="japanese-vibe">日本語能力試験</div> <br />
+          <h1 className="dashboard-title">JLPT-Platform</h1>
+          <p className="dashboard-subtitle"></p>
+        </header>
 
-          <main className="cover-title-group">
-            <h1 className="cover-n-level">N5</h1>
-            <div className="cover-jp-title">げんごちしき <span style={{ fontSize: '1.2rem' }}>(もじ・ごい)</span></div>
-            <div className="cover-time">(25ふん)</div>
-
-            <div className="notes-box">
-              <h2>ちゅうい</h2>
-              <span className="notes-sub">Notes</span>
-              <ul className="notes-list">
-                <li>
-                  <span className="note-num">1.</span>
-                  <span className="note-jp">しけんが　はじまるまで、この　もんだいようしを　あけないで　ください。</span>
-                  <span className="note-en">Do not open this question booklet until the test begins.</span>
-                </li>
-                <li>
-                  <span className="note-num">2.</span>
-                  <span className="note-jp">この　もんだいようしを　もって　かえる　ことは　できません。</span>
-                  <span className="note-en">Do not take this question booklet with you after the test.</span>
-                </li>
-                <li>
-                  <span className="note-num">3.</span>
-                  <span className="note-jp">じゅけんばんごうと　なまえを　したの　らんに、じゅけんひょうと　おなじように　かいて　ください。</span>
-                  <span className="note-en">Write your examinee registration number and name clearly in each box below as written on your test voucher.</span>
-                </li>
-                <li>
-                  <span className="note-num">4.</span>
-                  <span className="note-jp">この　もんだいようしは　ぜんぶで　８ページ　あります。</span>
-                  <span className="note-en">This question booklet has 8 pages.</span>
-                </li>
-                <li>
-                  <span className="note-num">5.</span>
-                  <span className="note-jp">もんだいには　かいとうばんごうの　<span className="note-box-inline">1</span>、<span className="note-box-inline">2</span>、<span className="note-box-inline">3</span> …　が　あります。かいとうは、かいとうようしに　ある　おなじ　ばんごうの　ところに　マークして　ください。</span>
-                  <span className="note-en">One of the row numbers 1, 2, 3 ... is given for each question. Mark your answer in the same row of the answer sheet.</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="examinee-fields">
-              <div className="field-row">
-                <div className="field-label">
-                  <span className="label-jp">じゅけんばんごう</span>
-                  <span className="label-en">Examinee Registration Number</span>
-                </div>
-                <div className="field-input">
-                  <input
-                    type="text"
-                    value={examineeNumber}
-                    onChange={(e) => setExamineeNumber(e.target.value)}
-                    placeholder="12345678"
-                  />
-                </div>
+        <main className="dashboard-grid">
+          {mockTests.map((testId) => (
+            <div key={testId} className="mock-test-card glass-panel" onClick={() => startTest(testId)}>
+              <div className="card-icon">📄</div>
+              <h2>Mock-Test{testId}</h2>
+              <div className="card-details">
+                <span className="badge">N4 Level</span>
+                <span className="badge">120 Mins</span>
               </div>
-              <div className="field-row">
-                <div className="field-label">
-                  <span className="label-jp">なまえ</span>
-                  <span className="label-en">Name</span>
-                </div>
-                <div className="field-input">
-                  <input
-                    type="text"
-                    value={examineeName}
-                    onChange={(e) => setExamineeName(e.target.value)}
-                    placeholder="JAPANESE LEARNER"
-                  />
-                </div>
+              <div className="card-sections">
+                <div className="section-item"><span>1.</span> Kanji & Vocabulary</div>
+                <div className="section-item"><span>2.</span> Grammar & Reading</div>
+                <div className="section-item"><span>3.</span> Listening</div>
               </div>
+              <button className="card-start-btn" disabled={loading}>
+                {loading ? 'Loading...' : 'Start Test'}
+              </button>
             </div>
-          </main>
-
-          <footer className="cover-footer">
-            <div className="page-num-circle">3</div>
-          </footer>
-        </div>
-
-        <div className="start-test-action">
-          <button className="start-btn" onClick={startTest} disabled={loading}>
-            {loading ? 'Initializing...' : 'Start Mock Test'}
-          </button>
-        </div>
+          ))}
+        </main>
       </div>
     );
   }
@@ -210,9 +175,22 @@ function App() {
   if (view === 'exam') {
     const question = questions[currentIndex];
     const currentAnswer = answers.find(a => a.question_id === question.id);//
+    // Helper to get section name dynamically
+    const getSectionName = (sectionId) => {
+      const sections = {
+        0: "Section 1: Kanji & Vocabulary",
+        1: "Section 2: Grammar & Reading",
+        2: "Section 3: Listening"
+      };
+      return sections[sectionId] || `Section ${sectionId + 1}`;
+    };
+
     return (
-      <div className="exam-container">
+      <div className="exam-container glass-panel">
         <div className="exam-header">
+          <div className="section-title" style={{ fontWeight: 'bold', color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>
+            {getSectionName(question.section)}
+          </div>
           <div className="progress-info">
             <span>QUESTION {currentIndex + 1} OF {questions.length}</span>
             <div className="progress-bar">
@@ -225,7 +203,19 @@ function App() {
             <span className="timer-text">{formatTime(timeLeft)}</span>
           </div>
 
-          <button className="submit-early-btn" onClick={submitTest}>Final Submit</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+            <button className="submit-early-btn" onClick={submitTest}>Final Submit</button>
+            <button className="quit-btn" onClick={() => {
+              if (window.confirm('Quit the test? Your progress will be lost.')) {
+                setView('landing');
+                setQuestions([]);
+                setAnswers([]);
+                setSession(null);
+                setCurrentIndex(0);
+                setTimeLeft(0);
+              }
+            }}>✕ Quit</button>
+          </div>
 
         </div>
 
@@ -251,7 +241,7 @@ function App() {
               ))}
             </h2>
 
-            {question.image_url && (
+            {question.image_url && !question.image_url.startsWith('{') && (
               <div className="question-image">
                 <img src={question.image_url} alt="Question context" />
               </div>
@@ -289,7 +279,7 @@ function App() {
   if (view === 'result') {
     return (
       <div className="result-container">
-        <div className="result-card">
+        <div className="result-card glass-panel">
           <div className="result-icon">🎯</div>
           <h1>Test Completed!</h1>
           <div className="score-display">
@@ -314,8 +304,8 @@ function App() {
                   <div
                     className="section-bar-fill"
                     style={{
-                      width: `${(section.correct / section.total) * 100}%`,
-                      backgroundColor: (section.correct / section.total) >= 0.6 ? '#10b981' : '#ef4444'
+                      width: `${section.total > 0 ? (section.correct / section.total) * 100 : 0}%`,
+                      backgroundColor: (section.total > 0 && (section.correct / section.total) >= 0.6) ? '#10b981' : '#ef4444'
                     }}
                   ></div>
                 </div>

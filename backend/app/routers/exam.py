@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
+import json
+import hashlib
+import time
 from .. import models, schemas
 from ..database import get_db
 
@@ -56,12 +59,11 @@ def get_questions(test_id: int, section: int = None, db: Session = Depends(get_d
             "audio_metadata": None
         }
         
-        # Parse audio metadata if available
-        if q.image_url and q.image_url.startswith('{'):
+        # Parse audio metadata if available (checks if image_url is a JSON string)
+        if q.image_url and q.image_url.strip().startswith('{'):
             try:
-                import json
                 question_dict["audio_metadata"] = json.loads(q.image_url)
-            except:
+            except (json.JSONDecodeError, TypeError):
                 pass
         
         result.append(question_dict)
@@ -72,7 +74,11 @@ def get_questions(test_id: int, section: int = None, db: Session = Depends(get_d
 def generate_audio(question_id: int, db: Session = Depends(get_db)):
     """Generate AI audio for a listening question."""
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
-    if not question or question.type != "Listening":
+    
+    # Check for "Listening" or Japanese "聴解" (Listening) strings
+    is_listening = question and ("Listening" in question.type or "聴解" in question.type)
+    
+    if not question or not is_listening:
         raise HTTPException(status_code=404, detail="Listening question not found")
 
     # Simulate AI audio generation
@@ -98,7 +104,7 @@ def generate_audio(question_id: int, db: Session = Depends(get_db)):
         "generated_at": datetime.utcnow().isoformat(),
         "transcript": audio_content[:200] + "..."
     }
-    question.image_url = str(metadata)  # Store as JSON string
+    question.image_url = json.dumps(metadata)  # Store as JSON string
     
     db.commit()
     
@@ -115,20 +121,28 @@ def submit_test(submission: schemas.TestSubmit, db: Session = Depends(get_db)):
     session = db.query(models.TestSession).filter(models.TestSession.id == submission.session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Test session not found.")
+        
+    if session.is_completed:
+        raise HTTPException(status_code=400, detail="Test session is already completed.")
 
     correct_count = 0
-    total_questions = len(submission.answers)
+    total_questions = db.query(models.Question).filter(models.Question.test_id == session.test_id).count()
     
     # Track section scores
-    # Section IDs: 1 (Kanji/Grammar), 2 (Reading), 3 (Listening)
+    # Section IDs: 0 (Vocabulary & Grammar), 1 (Reading Comprehension), 2 (Listening)
     section_data = {
-        1: {"correct": 0, "total": 0, "name": "Vocabulary & Grammar"},
-        2: {"correct": 0, "total": 0, "name": "Reading Comprehension"},
-        3: {"correct": 0, "total": 0, "name": "Listening"}
+        0: {"correct": 0, "total": 0, "name": "Vocabulary & Grammar"},
+        1: {"correct": 0, "total": 0, "name": "Reading Comprehension"},
+        2: {"correct": 0, "total": 0, "name": "Listening"}
     }
 
+    # Fetch all submitted questions at once
+    submitted_q_ids = [a.question_id for a in submission.answers]
+    questions = db.query(models.Question).filter(models.Question.id.in_(submitted_q_ids)).all()
+    question_map = {q.id: q for q in questions}
+
     for answer in submission.answers:
-        question = db.query(models.Question).filter(models.Question.id == answer.question_id).first()
+        question = question_map.get(answer.question_id)
         if question:
             is_correct = (question.correct_index == answer.selected_index)
             
@@ -137,7 +151,9 @@ def submit_test(submission: schemas.TestSubmit, db: Session = Depends(get_db)):
                 section_data[question.section]["total"] += 1
                 if is_correct:
                     section_data[question.section]["correct"] += 1
-                    correct_count += 1
+            
+            if is_correct:
+                correct_count += 1
             
             # Save individual answers
             user_answer = models.UserAnswer(
