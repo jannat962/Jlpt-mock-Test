@@ -24,9 +24,15 @@ def auto_seed():
         
         # Check if any questions exist
         if db.query(Question).count() == 0:
-            print("🌱 Auto-seeding: No questions found. Please run seed scripts manually or via CLI.")
-            # Note: We don't full-seed here to keep startup fast, 
-            # but having the user fixed the "Start Session" error.
+            print("🌱 Auto-seeding: Creating sample questions...")
+            sample_q = Question(
+                test_id=1, section=0, number=1, type="もんだい １",
+                question_text="＿＿＿ の ことばは どう よみますか。\n\n新しい くるまですね。",
+                options=["あたらしい", "あだらしい", "あらたしい", "あらだしい"], correct_index=0
+            )
+            db.add(sample_q)
+            db.commit()
+            print("✅ Sample questions created.")
             
     except Exception as e:
         print(f"⚠️ Auto-seed failed: {e}")
