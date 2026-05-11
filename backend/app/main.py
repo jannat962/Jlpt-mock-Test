@@ -3,8 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from .database import engine, SessionLocal
-from .routers import exam
+from .routers import exam, admin, auth
 from .models import User, Question
+from .auth_utils import hash_password
 
 # Auto-create all tables on startup
 models.Base.metadata.create_all(bind=engine)
@@ -13,33 +14,50 @@ def auto_seed():
     db = SessionLocal()
     try:
         # Check if user exists
-        if not db.query(User).filter(User.id == 1).first():
-            print("🌱 Auto-seeding: Creating test user...")
-            test_user = User(
-                id=1, name="Test User", email="test@example.com", 
-                password_hash="test123", readiness_score=0.0
+        if not db.query(models.User).filter(models.User.email == "test@example.com").first():
+            print("Auto-seeding: Creating test user...")
+            test_user = models.User(
+                name="Test User", email="test@example.com", 
+                password_hash=hash_password("test123"), role="learner", readiness_score=0.0
             )
             db.add(test_user)
             db.commit()
         
+        # Check if any tests exist
+        if db.query(models.MockTest).count() == 0:
+            print("Auto-seeding: Creating sample test...")
+            sample_test = models.MockTest(
+                id=1, title="Sample Mock Exam #1", level="N4", duration=120
+            )
+            db.add(sample_test)
+            db.commit()
+
         # Check if any questions exist
-        if db.query(Question).count() == 0:
-            print("🌱 Auto-seeding: Creating sample questions...")
-            sample_q = Question(
-                test_id=1, section=0, number=1, type="もんだい １",
-                question_text="＿＿＿ の ことばは どう よみますか。\n\n新しい くるまですね。",
-                options=["あたらしい", "あだらしい", "あらたしい", "あらだしい"], correct_index=0
+        if db.query(models.Question).count() == 0:
+            print("Auto-seeding: Creating sample questions...")
+            sample_q = models.Question(
+                test_id=1, section=0, number=1, type="Mondai 1",
+                question_text="Kore wa ... desu.",
+                options=["A", "B", "C", "D"], correct_index=0
             )
             db.add(sample_q)
             db.commit()
-            print("✅ Sample questions created.")
+            print("Sample data created.")
             
     except Exception as e:
-        print(f"⚠️ Auto-seed failed: {e}")
+        print(f"Auto-seed failed: {e}")
     finally:
         db.close()
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(title="JLPT N4 Mock Test API", version="1.0.0")
+
+# Serve static audio files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.on_event("startup")
 async def startup_event():
@@ -73,5 +91,7 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
-# Register the exam routes
+# Register routers
 app.include_router(exam.router, prefix="/api/tests", tags=["Exam Engine"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin Panel"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

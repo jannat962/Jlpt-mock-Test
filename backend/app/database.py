@@ -7,8 +7,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Connect to PostgreSQL (Update with your actual credentials)
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:Jannat30@localhost:5432/jlpt_n4_db")
+# Connect to PostgreSQL - DATABASE_URL REQUIRED
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+if not SQLALCHEMY_DATABASE_URL:
+    raise ValueError(
+        "CRITICAL: DATABASE_URL environment variable is not set. "
+        "This is required for database connectivity."
+    )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

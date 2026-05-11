@@ -7,18 +7,38 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
+    role: Optional[str] = "learner"
 
 class UserResponse(BaseModel):
     id: int
     name: str
     email: EmailStr
-    readiness_score: float
+    readiness_score: Optional[float] = 0.0
+    role: Optional[str] = "learner"
 
     class Config:
         from_attributes = True
 
 # --- Question Schemas ---
-class QuestionResponse(BaseModel):
+class QuestionCreate(BaseModel):
+    section: int = 0
+    number: int = 1
+    type: str = "Multiple Choice"
+    question_text: str
+    options: List[str]
+    correct_index: int
+    audio_url: Optional[str] = None
+    image_url: Optional[str] = None
+
+# --- Test Schemas ---
+class MockTestCreate(BaseModel):
+    title: str
+    level: str
+    duration: int
+    questions: List[QuestionCreate] = []
+
+# --- Question Schemas ---
+class QuestionLearnerResponse(BaseModel):
     id: int
     section: int
     number: int
@@ -27,7 +47,34 @@ class QuestionResponse(BaseModel):
     options: List[str]
     audio_url: Optional[str] = None
     image_url: Optional[str] = None
-    audio_metadata: Optional[dict] = None  # For AI-generated audio info
+    audio_metadata: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+class QuestionResponse(BaseModel):
+    id: int
+    section: int
+    number: int
+    type: str
+    question_text: str
+    options: List[str]
+    correct_index: int
+    audio_url: Optional[str] = None
+    image_url: Optional[str] = None
+    audio_metadata: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Test Schemas ---
+class MockTestResponse(BaseModel):
+    id: int
+    title: str
+    level: str
+    duration: int
+    created_at: datetime
+    questions: List[QuestionResponse] = []
 
     class Config:
         from_attributes = True
@@ -40,6 +87,9 @@ class AnswerSubmit(BaseModel):
 class TestSubmit(BaseModel):
     session_id: int
     answers: List[AnswerSubmit]
+
+class AudioGenerate(BaseModel):
+    text: str
 
 class TestResult(BaseModel):
     score_percentage: float

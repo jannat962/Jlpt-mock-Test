@@ -9,6 +9,10 @@
       "destination": "https://jlpt-platform-backend.onrender.com/api/:path*"
     },
     {
+      "source": "/static/:path*",
+      "destination": "https://jlpt-platform-backend.onrender.com/static/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }

@@ -1,36 +1,47 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
-import json
-import hashlib
 import time
+import json
+from jose import jwt, JWTError
 from .. import models, schemas
 from ..database import get_db
+from ..auth_utils import SECRET_KEY, ALGORITHM
 
 router = APIRouter()
+security = HTTPBearer()
+
+# Authentication helper function
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> int:
+    """Extract and validate JWT token, return authenticated user ID"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user_id
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@router.get("/", response_model=List[schemas.MockTestResponse])
+def list_available_tests(current_user: int = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List all available mock tests for learners."""
+    return db.query(models.MockTest).all()
 
 @router.post("/start/{test_id}", response_model=schemas.TestSessionResponse)
-def start_test(test_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Creates a new test session. Auto-creates user 1 if missing."""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    
-    if not user and user_id == 1:
-        # Self-healing: Create the default test user if missing
-        user = models.User(
-            id=1,
-            name="Test User",
-            email="test@example.com",
-            password_hash="test12345",
-            readiness_score=0.0
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    elif not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+def start_test(test_id: int, current_user: int = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Creates a new test session for the authenticated user."""
+    test = db.query(models.MockTest).filter(models.MockTest.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Mock test not found.")
 
-    new_session = models.TestSession(user_id=user_id, test_id=test_id)
+    new_session = models.TestSession(user_id=current_user, test_id=test_id, is_completed=False)
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
@@ -41,7 +52,7 @@ def test_endpoint():
     """Simple test endpoint to verify router is working."""
     return {"message": "Exam router is working!", "status": "ok"}
 
-@router.get("/{test_id}/questions", response_model=List[schemas.QuestionResponse])
+@router.get("/{test_id}/questions", response_model=List[schemas.QuestionLearnerResponse])
 def get_questions(test_id: int, section: int = None, db: Session = Depends(get_db)):
     """Fetches questions based on Test ID and optional Section."""
     query = db.query(models.Question).filter(models.Question.test_id == test_id)
@@ -84,56 +95,78 @@ def get_questions(test_id: int, section: int = None, db: Session = Depends(get_d
     return result
 
 @router.post("/generate-audio/{question_id}")
-def generate_audio(question_id: int, db: Session = Depends(get_db)):
-    """Generate AI audio for a listening question."""
-    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+def generate_audio(
+    question_id: int, 
+    request: schemas.AudioGenerate,
+    current_user: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate high-quality AI audio using gTTS. Requires authentication."""
+    import os
+    import logging
     
-    # Check for "Listening" or Japanese "聴解" (Listening) strings
-    is_listening = question and ("Listening" in question.type or "聴解" in question.type)
+    logger = logging.getLogger(__name__)
     
-    if not question or not is_listening:
-        raise HTTPException(status_code=404, detail="Listening question not found")
+    # Validate input
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text is required and cannot be empty")
+    
+    if len(request.text) > 2000:
+        raise HTTPException(status_code=400, detail="Text exceeds maximum length of 2000 characters")
 
-    # Simulate AI audio generation
-    import time
-    import hashlib
+    # Path logic
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    audio_dir = os.path.join(base_dir, "static", "audio")
+    if not os.path.exists(audio_dir):
+        os.makedirs(audio_dir)
     
-    # Generate a unique audio ID based on question content
-    audio_content = question.question_text
-    audio_id = hashlib.md5(audio_content.encode()).hexdigest()[:8]
+    filename = f"audio_{int(time.time() * 1000)}.mp3"
+    static_path = os.path.join(audio_dir, filename)
     
-    # Simulate processing time
-    time.sleep(1)
-    
-    # Update question with generated audio URL
-    audio_url = f"https://audio-api.example.com/generate/{audio_id}.mp3"
-    question.audio_url = audio_url
-    
-    # Store audio metadata
-    metadata = {
-        "duration_seconds": 35,
-        "language": "ja",
-        "voice": "female_japanese_n4",
-        "generated_at": datetime.utcnow().isoformat(),
-        "transcript": audio_content[:200] + "..."
-    }
-    question.image_url = json.dumps(metadata)  # Store as JSON string
-    
-    db.commit()
-    
-    return {
-        "question_id": question_id,
-        "audio_url": audio_url,
-        "metadata": metadata,
-        "status": "generated"
-    }
+    try:
+        from gtts import gTTS
+        
+        tts = gTTS(text=request.text, lang='ja')
+        tts.save(static_path)
+        
+        # Validate the generated file
+        if not os.path.exists(static_path):
+            raise Exception("Audio file was not created")
+        
+        file_size = os.path.getsize(static_path)
+        if file_size == 0:
+            raise Exception("Generated audio file is empty")
+        
+        audio_url = f"/static/audio/{filename}"
+        
+        # Update question if question_id is provided
+        if question_id != 0:
+            question = db.query(models.Question).filter(models.Question.id == question_id).first()
+            if question:
+                question.audio_url = audio_url
+                db.commit()
+        
+        logger.info(f"Audio generated: {filename}, size: {file_size} bytes")
+        return {"audio_url": audio_url}
+        
+    except Exception as e:
+        logger.error(f"Audio generation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
 
 @router.post("/submit", response_model=schemas.TestResult)
-def submit_test(submission: schemas.TestSubmit, db: Session = Depends(get_db)):
-    """Calculates score and saves test results."""
+def submit_test(
+    submission: schemas.TestSubmit,
+    current_user: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Calculates score and saves test results. Requires authentication."""
     session = db.query(models.TestSession).filter(models.TestSession.id == submission.session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Test session not found.")
+    
+    # SECURITY: Verify user owns this session
+    if session.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Cannot submit answers for another user's session")
         
     if session.is_completed:
         raise HTTPException(status_code=400, detail="Test session is already completed.")
@@ -192,4 +225,4 @@ def submit_test(submission: schemas.TestSubmit, db: Session = Depends(get_db)):
         "correct_answers": correct_count,
         "total_questions": total_questions,
         "section_scores": section_data
-    }
+    }
