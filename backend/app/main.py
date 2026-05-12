@@ -7,26 +7,53 @@ from .routers import exam, admin, auth
 from .models import User, Question
 from .auth_utils import hash_password
 
-from contextlib import asynccontextmanager
+import logging
+import traceback
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Create tables and auto-seed
     print("[STARTUP] Initializing database...")
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        print("[STARTUP] Database tables verified.")
-        auto_seed()
-    except Exception as e:
-        print(f"[STARTUP] Error during initialization: {e}")
+    retry_count = 0
+    max_retries = 3
+    while retry_count < max_retries:
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            print("[STARTUP] Database tables verified.")
+            auto_seed()
+            break
+        except Exception as e:
+            retry_count += 1
+            print(f"[STARTUP] Initialization attempt {retry_count} failed: {e}")
+            if retry_count < max_retries:
+                import time
+                time.sleep(2)
+            else:
+                print("[STARTUP] CRITICAL: Database initialization failed after multiple attempts.")
     yield
-    # Shutdown logic (if any) could go here
 
 app = FastAPI(
     title="JLPT N4 Mock Test API", 
     version="1.0.0",
     lifespan=lifespan
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log the full stack trace for debugging production 500 errors
+    error_msg = f"Internal Server Error: {str(exc)}"
+    print(f"[ERROR] {error_msg}")
+    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": error_msg}
+    )
 
 def auto_seed():
     db = SessionLocal()
