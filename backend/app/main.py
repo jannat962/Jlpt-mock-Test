@@ -91,7 +91,8 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Use predefined origins to allow credentials securely
+    allow_origins=origins,  # Allowed for credentials
+    allow_origin_regex="https://jlpt-platform.*\.vercel\.app", # Support all Vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
