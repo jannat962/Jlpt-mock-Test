@@ -7,8 +7,26 @@ from .routers import exam, admin, auth
 from .models import User, Question
 from .auth_utils import hash_password
 
-# Auto-create all tables on startup
-models.Base.metadata.create_all(bind=engine)
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create tables and auto-seed
+    print("[STARTUP] Initializing database...")
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        print("[STARTUP] Database tables verified.")
+        auto_seed()
+    except Exception as e:
+        print(f"[STARTUP] Error during initialization: {e}")
+    yield
+    # Shutdown logic (if any) could go here
+
+app = FastAPI(
+    title="JLPT N4 Mock Test API", 
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 def auto_seed():
     db = SessionLocal()
@@ -58,10 +76,6 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-@app.on_event("startup")
-async def startup_event():
-    auto_seed()
 
 # Configure CORS — allow localhost for dev and Vercel for production
 origins = [

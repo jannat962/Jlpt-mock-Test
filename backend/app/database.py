@@ -8,16 +8,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Connect to PostgreSQL - DATABASE_URL REQUIRED
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+# On Render, we prioritize os.environ over local .env files
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not SQLALCHEMY_DATABASE_URL:
+    # Fallback to load_dotenv only if system env is missing
+    load_dotenv()
+    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError(
-        "CRITICAL: DATABASE_URL environment variable is not set. "
-        "This is required for database connectivity."
+        "CRITICAL: DATABASE_URL environment variable is not set."
     )
 
 # Fix for Render/Heroku: SQLAlchemy 1.4+ requires 'postgresql://' instead of 'postgres://'
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Masked logging for debugging
+masked_url = SQLALCHEMY_DATABASE_URL.split('@')[-1] if '@' in SQLALCHEMY_DATABASE_URL else 'HIDDEN'
+print(f"[DB] Connecting to host: {masked_url}")
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
