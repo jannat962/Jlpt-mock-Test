@@ -1,16 +1,16 @@
 import os
-from fastapi import FastAPI
+import logging
+import traceback
+import time
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from .database import engine, SessionLocal
 from .routers import exam, admin, auth
 from .models import User, Question
 from .auth_utils import hash_password
-
-import logging
-import traceback
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
