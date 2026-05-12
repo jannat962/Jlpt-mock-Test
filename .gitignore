@@ -7,3 +7,6 @@ venv/
 .venv/
 *.db
 .DS_Store
+backend/app/static/audio/
+**/__pycache__/
+*.pyc

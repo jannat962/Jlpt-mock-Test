@@ -5,10 +5,14 @@ from typing import List
 from datetime import datetime
 import time
 import json
+import os
+import logging
 from jose import jwt, JWTError
 from .. import models, schemas
 from ..database import get_db
 from ..auth_utils import SECRET_KEY, ALGORITHM
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
@@ -101,32 +105,33 @@ def generate_audio(
     current_user: int = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate high-quality AI audio using gTTS. Requires authentication."""
-    import os
-    import logging
+    """Generate AI audio from Japanese text using gTTS. Teacher authentication required."""
     
-    logger = logging.getLogger(__name__)
+    # Only teachers/admins can generate audio
+    user = db.query(models.User).filter(models.User.id == current_user).first()
+    if not user or user.role != 'teacher':
+        raise HTTPException(status_code=403, detail="Only teachers can generate audio content")
     
     # Validate input
     if not request.text or not request.text.strip():
         raise HTTPException(status_code=400, detail="Text is required and cannot be empty")
     
-    if len(request.text) > 2000:
-        raise HTTPException(status_code=400, detail="Text exceeds maximum length of 2000 characters")
+    if len(request.text) > 5000:
+        raise HTTPException(status_code=400, detail="Text exceeds maximum length of 5000 characters")
 
     # Path logic
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     audio_dir = os.path.join(base_dir, "static", "audio")
-    if not os.path.exists(audio_dir):
-        os.makedirs(audio_dir)
+    os.makedirs(audio_dir, exist_ok=True)
     
-    filename = f"audio_{int(time.time() * 1000)}.mp3"
+    timestamp = int(time.time() * 1000)
+    filename = f"listening_{timestamp}.mp3"
     static_path = os.path.join(audio_dir, filename)
     
     try:
         from gtts import gTTS
         
-        tts = gTTS(text=request.text, lang='ja')
+        tts = gTTS(text=request.text.strip(), lang='ja', slow=False)
         tts.save(static_path)
         
         # Validate the generated file
@@ -135,23 +140,65 @@ def generate_audio(
         
         file_size = os.path.getsize(static_path)
         if file_size == 0:
-            raise Exception("Generated audio file is empty")
+            os.remove(static_path)
+            raise Exception("Generated audio file is empty — gTTS returned no data")
         
         audio_url = f"/static/audio/{filename}"
         
-        # Update question if question_id is provided
-        if question_id != 0:
+        # Update question in DB if a real question_id is provided
+        if question_id and question_id != 0:
             question = db.query(models.Question).filter(models.Question.id == question_id).first()
             if question:
                 question.audio_url = audio_url
                 db.commit()
+                logger.info(f"Updated question {question_id} with audio: {filename}")
         
-        logger.info(f"Audio generated: {filename}, size: {file_size} bytes")
-        return {"audio_url": audio_url}
+        logger.info(f"Audio generated successfully: {filename}, size: {file_size} bytes")
+        return {
+            "audio_url": audio_url,
+            "filename": filename,
+            "file_size_bytes": file_size,
+            "language": "ja",
+            "question_id": question_id
+        }
         
+    except HTTPException:
+        raise
     except Exception as e:
+        # Clean up failed file
+        if os.path.exists(static_path):
+            try:
+                os.remove(static_path)
+            except Exception:
+                pass
         logger.error(f"Audio generation failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
+
+
+@router.delete("/audio/{filename}")
+def delete_audio_file(
+    filename: str,
+    current_user: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete an audio file. Teacher only."""
+    user = db.query(models.User).filter(models.User.id == current_user).first()
+    if not user or user.role != 'teacher':
+        raise HTTPException(status_code=403, detail="Teacher role required")
+    
+    # Security: only allow simple filenames, no path traversal
+    if '/' in filename or '\\' in filename or '..' in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(base_dir, "static", "audio", filename)
+    
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        logger.info(f"Deleted audio file: {filename}")
+        return {"message": f"Audio file '{filename}' deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Audio file not found")
 
 @router.post("/submit", response_model=schemas.TestResult)
 def submit_test(

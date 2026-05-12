@@ -34,7 +34,7 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    test_id = Column(Integer, ForeignKey("mock_tests.id"))
+    test_id = Column(Integer, ForeignKey("mock_tests.id", ondelete="CASCADE"))
     section = Column(Integer) # 0: Kanji, 1: Grammar/Reading, 2: Listening
     number = Column(Integer)
     type = Column(String) # "Vocabulary", "Reading Comprehension", "Listening"
@@ -51,8 +51,8 @@ class TestSession(Base):
     __tablename__ = "test_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    test_id = Column(Integer, ForeignKey("mock_tests.id"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    test_id = Column(Integer, ForeignKey("mock_tests.id", ondelete="CASCADE"))
     start_time = Column(DateTime, default=datetime.utcnow)
     end_time = Column(DateTime, nullable=True)
     score = Column(Float, nullable=True)
@@ -67,8 +67,8 @@ class UserAnswer(Base):
     __tablename__ = "user_answers"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("test_sessions.id"))
-    question_id = Column(Integer, ForeignKey("questions.id"))
+    session_id = Column(Integer, ForeignKey("test_sessions.id", ondelete="CASCADE"))
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"))
     selected_index = Column(Integer)
     is_correct = Column(Boolean)
 

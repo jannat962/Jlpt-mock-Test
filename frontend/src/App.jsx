@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -266,10 +266,15 @@ const AdminDashboard = ({ availableTests, createTest, editTest, deleteTest }) =>
   </div>
 );
 
-const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAudio, loading }) => {
+const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAudio, loading, generatingAudioIdx }) => {
   const getFullAudioUrl = (url) => {
     if (!url) return '';
-    return url;
+    if (url.startsWith('http')) return url;
+    
+    // In production, the backend might be on a different domain.
+    // We construct the absolute URL using the base API URL.
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
   };
 
   const addQuestion = () => {
@@ -290,6 +295,17 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
   const updateQuestion = (idx, field, value) => {
     const newQs = [...editingTest.questions];
     newQs[idx][field] = value;
+    
+    // Auto-assign sections for better scoring reports
+    // Section 2 is dedicated to Listening in the backend submission logic
+    if (field === 'type') {
+      if (value === 'Listening') {
+        newQs[idx].section = 2;
+      } else {
+        newQs[idx].section = 0; // Default to Vocabulary & Grammar for Reading
+      }
+    }
+    
     setEditingTest({ ...editingTest, questions: newQs });
   };
 
@@ -310,7 +326,7 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
         <header className="header-section" style={{ display: 'flex', justifyContent: 'space-between' }}>
           <h1>{editingTest?.id ? 'Edit' : 'Create'} Mock Test</h1>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="btn-primary" style={{ width: 'auto' }} onClick={saveTest}>Save Test</button>
+            <button className="btn-primary" style={{ width: 'auto' }} onClick={saveTest}>💾 Save Test</button>
             <button className="btn-nav" style={{ width: 'auto' }} onClick={() => setView('admin-dashboard')}>Cancel</button>
           </div>
         </header>
@@ -320,9 +336,7 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
             <div>
               <label className="profile-label">Test Title</label>
               <input 
-                type="text" 
-                className="auth-input" 
-                placeholder="e.g. N4 Mock Exam #1"
+                type="text" className="auth-input" placeholder="e.g. N4 Mock Exam #1"
                 value={editingTest?.title || ''}
                 onChange={(e) => setEditingTest({ ...editingTest, title: e.target.value })}
               />
@@ -337,9 +351,17 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
                 <option value="N1">N1</option>
               </select>
             </div>
-            <div>
+            <div className="form-group">
               <label className="profile-label">Mins</label>
-              <input type="number" className="auth-input" value={editingTest?.duration} onChange={(e) => setEditingTest({...editingTest, duration: parseInt(e.target.value)})}/>
+              <input 
+                type="number" 
+                className="auth-input" 
+                value={editingTest?.duration || 0} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setEditingTest({...editingTest, duration: isNaN(val) ? 0 : val});
+                }}
+              />
             </div>
           </div>
         </div>
@@ -350,14 +372,30 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
             <button className="btn-nav" style={{ width: 'auto', fontSize: '0.8rem' }} onClick={addQuestion}>+ Add Question</button>
           </div>
 
-          <div className="questions-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {editingTest.questions?.map((q, qIdx) => (
-              <div key={qIdx} className="widget" style={{ borderLeft: '4px solid var(--primary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>QUESTION #{qIdx + 1}</span>
-                  <button onClick={() => removeQuestion(qIdx)} style={{ color: '#ef4444', fontSize: '0.8rem' }}>Remove</button>
+              <div key={`q-${q.id || qIdx}`} className="widget" style={{ borderLeft: `4px solid ${q.type === 'Listening' ? '#7c3aed' : 'var(--primary)'}` }}>
+                {/* Question Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontWeight: '800', color: q.type === 'Listening' ? '#7c3aed' : 'var(--primary)', fontSize: '0.8rem' }}>
+                      QUESTION #{qIdx + 1}
+                    </span>
+                    {q.type === 'Listening' && (
+                      <span style={{ background: '#ede9fe', color: '#7c3aed', fontSize: '0.65rem', fontWeight: '800', padding: '0.2rem 0.6rem', borderRadius: '20px', letterSpacing: '0.05em' }}>
+                        🎧 LISTENING
+                      </span>
+                    )}
+                    {q.audio_url && q.type === 'Listening' && (
+                      <span style={{ background: '#dcfce7', color: '#166534', fontSize: '0.65rem', fontWeight: '800', padding: '0.2rem 0.6rem', borderRadius: '20px' }}>
+                        ✅ AUDIO READY
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => removeQuestion(qIdx)} style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: '600' }}>Remove</button>
                 </div>
-                
+
+                {/* Question Type */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group">
                     <label className="profile-label">Question Type</label>
@@ -398,16 +436,14 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
                               boxShadow: '0 4px 6px -1px rgba(30, 58, 138, 0.2)'
                             }}
                             onClick={() => generateAudio(qIdx)}
-                            disabled={loading}
+                            disabled={generatingAudioIdx !== null}
                           >
-                            {loading ? (
-                              <>
-                                <span className="animate-spin">⏳</span>
-                                Processing AI Voice...
-                              </>
-                            ) : (
-                              <>✨ Generate High-Fidelity Audio</>
-                            )}
+                            <span style={{ display: generatingAudioIdx === qIdx ? 'flex' : 'none', alignItems: 'center', gap: '0.6rem' }}>
+                              <span className="animate-spin">⏳</span> Processing...
+                            </span>
+                            <span style={{ display: generatingAudioIdx === qIdx ? 'none' : 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              ✨ Generate AI Voice
+                            </span>
                           </button>
                           
                           {q.audio_url && (
@@ -427,24 +463,28 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
                           )}
                         </div>
                         
-                        {q.audio_url ? (
-                          <div style={{ width: '100%' }}>
-                            <audio 
-                              controls 
-                              src={getFullAudioUrl(q.audio_url)} 
-                              style={{ width: '100%', height: '36px', borderRadius: '8px' }} 
-                            />
-                            <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                              Tip: AI has processed your script into high-quality Japanese speech.
-                            </p>
+                        <div style={{ width: '100%', minHeight: '40px', position: 'relative' }}>
+                          <div style={{ display: q.audio_url ? 'block' : 'none' }}>
+                            <div key={`audio-prev-box-${qIdx}-${q.audio_url || 'none'}`} style={{ width: '100%' }}>
+                              <audio 
+                                key={`audio-prev-el-${qIdx}-${q.audio_url || 'none'}`}
+                                controls 
+                                src={q.audio_url ? getFullAudioUrl(q.audio_url) : ''} 
+                                style={{ width: '100%', height: '36px', borderRadius: '8px' }} 
+                              />
+                              <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                Tip: AI voice is ready for preview.
+                              </p>
+                            </div>
                           </div>
-                        ) : (
-                          <div style={{ textAlign: 'center', padding: '0.5rem', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-                            <p style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                              No audio found. Type your script below and click generate to create AI voice.
-                            </p>
+                          <div style={{ display: !q.audio_url ? 'block' : 'none' }}>
+                            <div style={{ textAlign: 'center', padding: '0.5rem', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                              <p style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                No audio yet. Type script below and click generate.
+                              </p>
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -504,8 +544,25 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
 const ExamView = ({ questions, currentIndex, setCurrentIndex, answers, handleAnswer, timeLeft, formatTime, submitTest, user, setView }) => {
   const getFullAudioUrl = (url) => {
     if (!url) return '';
-    return url;
+    if (url.startsWith('http')) return url;
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
   };
+
+  const audioRef = useRef(null);
+  const q = questions[currentIndex];
+  const isListening = q?.type === 'Listening' && q?.audio_url;
+  const selectedIdx = answers.find(a => a.question_id === q?.id)?.selected_index;
+
+  // Auto-play audio when question changes (avoids React DOM reconciliation bug from autoPlay attr)
+  useEffect(() => {
+    if (isListening && audioRef.current) {
+      audioRef.current.load();
+      audioRef.current.play().catch(() => {
+        // Browser blocked autoplay — user must press play manually
+      });
+    }
+  }, [currentIndex, isListening]);
 
   return (
     <div className="exam-view-full">
@@ -520,46 +577,72 @@ const ExamView = ({ questions, currentIndex, setCurrentIndex, answers, handleAns
         </header>
 
         <main className="question-content">
-          {questions[currentIndex]?.audio_url && (
-            <div className="listening-section" style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--primary)', fontWeight: '700', fontSize: '0.8rem' }}>
-                <span>🔊 LISTENING SECTION (LISTEN CAREFULLY)</span>
+          {/* LISTENING AUDIO PLAYER */}
+          {isListening && (
+            <div style={{ marginBottom: '1.75rem', background: 'linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%)', padding: '1.5rem', borderRadius: '16px', border: '1.5px solid #c4b5fd', boxShadow: '0 4px 24px rgba(124,58,237,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0, boxShadow: '0 4px 8px rgba(124,58,237,0.3)' }}>🎧</div>
+                <div>
+                  <div style={{ fontWeight: '800', color: '#7c3aed', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>聴解 — Listening Section</div>
+                  <div style={{ fontSize: '0.7rem', color: '#9333ea', marginTop: '0.1rem' }}>Audio plays automatically. You may replay it.</div>
+                </div>
               </div>
-              <audio controls autoPlay src={getFullAudioUrl(questions[currentIndex].audio_url)} style={{ width: '100%' }} />
+              <audio
+                ref={audioRef}
+                controls
+                src={getFullAudioUrl(q.audio_url)}
+                style={{ width: '100%', borderRadius: '10px' }}
+              />
+              <p style={{ fontSize: '0.65rem', color: '#7c3aed', marginTop: '0.6rem', fontWeight: '700', textAlign: 'center', letterSpacing: '0.03em' }}>
+                ⚠️ The audio script is hidden. Listen carefully and select the correct answer below.
+              </p>
             </div>
           )}
-          
-          {questions[currentIndex]?.type !== 'Listening' ? (
-            <div className="question-text">{questions[currentIndex]?.question_text}</div>
-          ) : (
-            <div className="question-text" style={{ fontSize: '0.9rem', color: '#64748b', fontStyle: 'italic', textAlign: 'center', padding: '1rem' }}>
-              "Listen to the audio clip above and select the correct answer from the 4 options below."
-            </div>
-          )}
-        <div className="options-list">
-          {questions[currentIndex]?.options.map((opt, idx) => (
-            <button
-              key={idx}
-              className={`option-btn ${answers.find(a => a.question_id === questions[currentIndex]?.id)?.selected_index === idx ? 'selected' : ''}`}
-              onClick={() => handleAnswer(questions[currentIndex]?.id, idx)}
-            >
-              <div className="option-index">{idx + 1}</div>
-              <div className="option-val">{opt}</div>
-            </button>
-          ))}
-        </div>
-      </main>
 
-      <footer className="exam-footer">
-        <button className="btn-nav" onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))} disabled={currentIndex === 0}>Previous</button>
-        {currentIndex === questions.length - 1 ? (
-          <button className="btn-next btn-nav" onClick={() => submitTest()}>Finish Exam</button>
-        ) : (
-          <button className="btn-next btn-nav" onClick={() => setCurrentIndex(prev => prev + 1)}>Next Question</button>
-        )}
-      </footer>
+          {/* QUESTION TEXT — hidden for listening, shown for reading */}
+          {q?.type !== 'Listening' ? (
+            <div className="question-text">{q?.question_text}</div>
+          ) : (
+            <div style={{ fontSize: '0.9rem', color: '#7c3aed', fontStyle: 'italic', textAlign: 'center', padding: '0.75rem 1.25rem', background: '#f5f3ff', borderRadius: '10px', border: '1px dashed #c4b5fd', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              🎧 Listen to the recording above, then select the correct answer.
+            </div>
+          )}
+
+          {/* ANSWER OPTIONS */}
+          <div className="options-list">
+            {q?.options.map((opt, idx) => (
+              <button
+                key={idx}
+                className={`option-btn ${selectedIdx === idx ? 'selected' : ''}`}
+                onClick={() => handleAnswer(q?.id, idx)}
+                style={{
+                  borderColor: selectedIdx === idx ? (isListening ? '#7c3aed' : 'var(--primary)') : undefined,
+                  background: selectedIdx === idx ? (isListening ? '#ede9fe' : 'var(--primary-light)') : undefined
+                }}
+              >
+                <div className="option-index" style={{ background: selectedIdx === idx ? (isListening ? '#7c3aed' : 'var(--primary)') : undefined, color: selectedIdx === idx ? 'white' : undefined }}>
+                  {['A','B','C','D'][idx]}
+                </div>
+                <div className="option-val">{opt}</div>
+              </button>
+            ))}
+          </div>
+        </main>
+
+        <footer className="exam-footer">
+          <button className="btn-nav" onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))} disabled={currentIndex === 0}>← Previous</button>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div style={{ fontWeight: '700' }}>{answers.length} / {questions.length}</div>
+            <div>answered</div>
+          </div>
+          {currentIndex === questions.length - 1 ? (
+            <button className="btn-next btn-nav" onClick={() => submitTest()}>Finish Exam ✓</button>
+          ) : (
+            <button className="btn-next btn-nav" onClick={() => setCurrentIndex(prev => prev + 1)}>Next →</button>
+          )}
+        </footer>
+      </div>
     </div>
-  </div>
   );
 };
 
@@ -582,6 +665,7 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [view, setView] = useState('login');
   const [loading, setLoading] = useState(false);
+  const [generatingAudioIdx, setGeneratingAudioIdx] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [availableTests, setAvailableTests] = useState([]);
@@ -828,7 +912,7 @@ function App() {
       if (!q.question_text) return alert("Please enter question text first");
       
       console.log(`[AUDIO] Starting generation for question ${qIdx}:`, q.question_text.substring(0, 50) + "...");
-      setLoading(true);
+      setGeneratingAudioIdx(qIdx);
       
       const qId = q.id || 0;
       const res = await fetch(`${API_URL}/tests/generate-audio/${qId}`, { 
@@ -859,7 +943,7 @@ function App() {
       console.error("[AUDIO] Generation Error:", err);
       alert(`AI Generation Failed: ${err.message}`); 
     } finally { 
-      setLoading(false); 
+      setGeneratingAudioIdx(null); 
     }
   };
 
@@ -902,6 +986,7 @@ function App() {
           setView={setView} 
           generateAudio={generateAudio}
           loading={loading}
+          generatingAudioIdx={generatingAudioIdx}
         />
       )}
 

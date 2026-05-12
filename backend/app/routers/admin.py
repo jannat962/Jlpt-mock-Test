@@ -85,6 +85,11 @@ def update_test(test_id: int, test_update: schemas.MockTestCreate, teacher: mode
     db_test.duration = test_update.duration
     
     # Update questions: Clear and recreate for simplicity
+    # Manual cleanup of dependent answers to avoid foreign key violations
+    db.query(models.UserAnswer).filter(models.UserAnswer.question_id.in_(
+        db.query(models.Question.id).filter(models.Question.test_id == test_id)
+    )).delete(synchronize_session=False)
+    
     db.query(models.Question).filter(models.Question.test_id == test_id).delete()
     
     for q in test_update.questions:
