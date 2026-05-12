@@ -6,7 +6,7 @@ services:
   - type: web
     name: jlpt-platform-backend
     runtime: python
-    buildCommand: pip install -r backend/requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     
     # Auto-restart on deployment
