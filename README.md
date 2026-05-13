@@ -1,9 +1,20 @@
 # 🇯🇵 JLPT Mock Test Platform - Setup Guide
-<img width="577" height="896" alt="image" src="https://github.com/user-attachments/assets/01c1ff0e-f883-4171-a279-b4c81cc5adff" />
-<img width="983" height="811" alt="image" src="https://github.com/user-attachments/assets/a87347b7-373b-45fc-89a8-4282e951c09c" />
-<img width="887" height="848" alt="image" src="https://github.com/user-attachments/assets/967c116c-c35b-4945-ba53-3c5e95bd82b0" />
-<img width="743" height="876" alt="image" src="https://github.com/user-attachments/assets/c7c9daf2-1470-4bbe-b920-8552b39f93c9" />
-<img width="613" height="806" alt="image" src="https://github.com/user-attachments/assets/f4a21737-7fdd-4f94-96be-0a0338628578" />
+*Teacher side*
+<img width="313" height="447" alt="image" src="https://github.com/user-attachments/assets/1a5ca3e9-ce7e-46c1-92f6-ecad2782d756" />
+<img width="1865" height="929" alt="image" src="https://github.com/user-attachments/assets/c0640d7f-ee1b-4cd0-bc2e-13c5c879787e" />
+<img width="1377" height="873" alt="image" src="https://github.com/user-attachments/assets/565384ad-2cec-477e-955a-5c0110079f14" />
+<img width="1227" height="712" alt="image" src="https://github.com/user-attachments/assets/9ec42631-0669-4a37-9bfe-733dc60b55aa" />
+
+*Student Side*
+<img width="295" height="439" alt="image" src="https://github.com/user-attachments/assets/774892f0-bc23-4b26-b396-8ac71bae4e9b" />
+<img width="1450" height="929" alt="image" src="https://github.com/user-attachments/assets/9949bc43-f288-491f-9368-9e54a8715277" />
+<img width="673" height="473" alt="image" src="https://github.com/user-attachments/assets/c6581612-36e3-4c32-976d-44b7f8db8d54" />
+<img width="629" height="613" alt="image" src="https://github.com/user-attachments/assets/711baab3-d834-462f-9d85-ad36e4a8ef19" />
+<img width="226" height="291" alt="image" src="https://github.com/user-attachments/assets/f3699499-06d2-410c-8946-0fff42bf65a3" />
+
+
+
+
 
 
 This project is a high-fidelity JLPT Mock Test platform featuring a **FastAPI** backend and a **React (Vite)** frontend. It includes automated scoring, section-wise analysis, and audio integration.
