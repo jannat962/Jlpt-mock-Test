@@ -16,8 +16,15 @@
 
 
 
+This project is a professional-grade JLPT Mock Test platform featuring a **FastAPI** backend and a **React (Vite)** frontend. It is designed for high-performance testing environments with a focus on realism and detailed student feedback.
 
-This project is a high-fidelity JLPT Mock Test platform featuring a **FastAPI** backend and a **React (Vite)** frontend. It includes automated scoring, section-wise analysis, and audio integration.
+---
+
+## 🌟 What's New (V2.0 Update)
+*   **🤖 AI-Powered Listening**: Integrated Google Text-to-Speech (gTTS) for dynamic audio generation. Teachers can now generate high-quality Japanese audio directly from text scripts for listening sections.
+*   **📊 Advanced Performance Analytics**: Detailed section-by-section breakdown (Vocabulary, Grammar, Reading, Listening) to help students identify their weak points.
+*   **☁️ Production-Ready Deployment**: Configured with robust CORS policies and environment-aware database pooling for seamless deployment on **Render** (Backend) and **Vercel** (Frontend).
+*   **🛠️ Hardened Backend**: Implemented global exception handling, database retry logic, and automated seeding for improved development workflow and production stability.
 
 ---
 
@@ -33,8 +40,8 @@ Before you begin, ensure you have the following installed:
 ## 📂 Project Structure
 ```text
 jlpt-platform/
-├── backend/          # FastAPI Server
-├── frontend/         # React + Vite Frontend
+├── backend/          # FastAPI Server (Python)
+├── frontend/         # React + Vite Frontend (JS/JSX)
 └── audio/            # Source Audio Files
 ```
 
@@ -70,7 +77,7 @@ jlpt-platform/
 5.  **Initialize & Seed Database**:
     ```bash
     python init_db.py           # Creates tables
-    python seed_final_test.py    # Seeds the final 27-question mock paper
+    python seed_final_test.py    # Seeds the final mock paper
     ```
 
 6.  **Run the Server**:
@@ -102,7 +109,7 @@ jlpt-platform/
 ---
 
 ## 🎧 Audio Assets
-If you add new audio files, place them in the `audio/` folder and copy them to `frontend/public/audio/` so the browser can serve them:
+If you add new audio files, place them in the `audio/` folder or use the integrated **AI Audio Generator** in the teacher panel. For manual files:
 ```bash
 cp ../audio/*.mp4 ./public/audio/
 ```
@@ -110,7 +117,10 @@ cp ../audio/*.mp4 ./public/audio/
 ---
 
 ## ✅ Features Implemented
-*   **Mondai 1-3**: Complete Kanji, Grammar, Reading, and Listening sections.
-*   **Instant Result**: Real-time scoring upon submission.
-*   **Detailed Analysis**: Section-by-section performance breakdown.
-*   **Premium UI**: Minimalist "Paper-style" Japanese exam aesthetic.
+*   **📚 Complete Exam Coverage**: Mondai 1-3 covering Kanji, Grammar, Reading, and Listening.
+*   **🔊 AI Listening Sections**: Realistic listening comprehension powered by AI speech synthesis.
+*   **⚡ Instant Result**: Real-time scoring upon submission with session persistence.
+*   **📉 In-Depth Analysis**: Interactive graphs and section-wise performance breakdowns.
+*   **💎 Premium UI**: Modern "Navy/Indigo" corporate aesthetic tailored for professional Japanese training.
+*   **🔒 Secure Auth**: JWT-based authentication for both learners and teachers.
+
