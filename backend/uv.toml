@@ -1,0 +1,4 @@
+# Configuration for uv package manager during build/deployment on Render
+# Instructs uv to copy files from the global cache instead of hardlinking, 
+# which avoids "Failed to hardlink files" warnings on Render's multi-filesystem setup.
+link-mode = "copy"
