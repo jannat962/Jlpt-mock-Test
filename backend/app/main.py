@@ -96,8 +96,6 @@ def auto_seed():
 
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="JLPT N4 Mock Test API", version="1.0.0")
-
 # Serve static audio files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
@@ -119,7 +117,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # Allowed for credentials
-    allow_origin_regex="https://jlpt-platform.*\.vercel\.app", # Support all Vercel previews
+    allow_origin_regex=r"https://jlpt-platform.*\.vercel\.app", # Support all Vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

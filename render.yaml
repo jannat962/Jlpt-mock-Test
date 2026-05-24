@@ -32,6 +32,10 @@ services:
       # Token expiration time
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 30
+      
+      # Suppress uv hardlink warning by using copy mode
+      - key: UV_LINK_MODE
+        value: copy
 
 # PostgreSQL Database
 # Renders free tier includes 1 PostgreSQL database
