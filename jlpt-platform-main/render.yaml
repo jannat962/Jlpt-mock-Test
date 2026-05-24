@@ -1,0 +1,42 @@
+# Render.yaml deployment configuration
+# Deploy this project to Render: https://render.com
+# Push to GitHub, then go to Render Dashboard > New > Web Service > Connect GitHub
+
+services:
+  - type: web
+    name: jlpt-platform-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    
+    # Auto-restart on deployment
+    autoDeploy: true
+    
+    # Environment variables
+    envVars:
+      # Database connection (auto-linked from the PostgreSQL database below)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jlpt-db
+          property: connectionString
+      
+      # JWT secret key (auto-generated securely by Render)
+      - key: SECRET_KEY
+        generateValue: true
+      
+      # JWT algorithm
+      - key: ALGORITHM
+        value: HS256
+      
+      # Token expiration time
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+
+# PostgreSQL Database
+# Renders free tier includes 1 PostgreSQL database
+databases:
+  - name: jlpt-db
+    databaseName: jlpt_n4_db
+    user: jlpt_user
+    plan: free
