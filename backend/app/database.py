@@ -30,13 +30,20 @@ masked_url = SQLALCHEMY_DATABASE_URL.split('@')[-1] if '@' in SQLALCHEMY_DATABAS
 print(f"[DB] Connecting to host: {masked_url}")
 
 # Create engine with pooling options for production stability
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,      # Verify connection before using
-    pool_recycle=300,        # Recycle connections every 5 minutes
-    pool_size=10,            # Standard pool size
-    max_overflow=20          # Allow up to 20 extra connections
-)
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True
+    )
+else:
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        pool_pre_ping=True,      # Verify connection before using
+        pool_recycle=300,        # Recycle connections every 5 minutes
+        pool_size=10,            # Standard pool size
+        max_overflow=20          # Allow up to 20 extra connections
+    )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

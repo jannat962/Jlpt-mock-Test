@@ -3,6 +3,7 @@ import logging
 import traceback
 import time
 from contextlib import asynccontextmanager
+from sqlalchemy import inspect, text
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,9 +23,30 @@ async def lifespan(app: FastAPI):
     print("[STARTUP] Initializing database...")
     retry_count = 0
     max_retries = 3
+    def ensure_question_columns():
+        inspector = inspect(engine)
+        if 'questions' not in inspector.get_table_names():
+            return
+
+        existing_columns = [col['name'] for col in inspector.get_columns('questions')]
+        alter_commands = []
+        if 'difficulty' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN difficulty VARCHAR NULL')
+        if 'explanation' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN explanation VARCHAR NULL')
+        if 'tags' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN tags JSON NULL')
+
+        if alter_commands:
+            with engine.begin() as conn:
+                for sql in alter_commands:
+                    print(f"[STARTUP] Applying DB schema change: {sql}")
+                    conn.execute(text(sql))
+
     while retry_count < max_retries:
         try:
             models.Base.metadata.create_all(bind=engine)
+            ensure_question_columns()
             print("[STARTUP] Database tables verified.")
             auto_seed()
             break

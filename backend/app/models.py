@@ -16,6 +16,8 @@ class User(Base):
 
     # Relationships
     sessions = relationship("TestSession", back_populates="user")
+    settings = relationship("TeacherSettings", back_populates="user", uselist=False)
+    templates = relationship("QuestionTemplate", back_populates="user")
 
 class MockTest(Base):
     __tablename__ = "mock_tests"
@@ -41,11 +43,48 @@ class Question(Base):
     question_text = Column(String)
     options = Column(JSON) # Stores list of options: ["A", "B", "C", "D"]
     correct_index = Column(Integer)
+    difficulty = Column(String, nullable=True)
+    explanation = Column(String, nullable=True)
+    tags = Column(JSON, nullable=True)
     audio_url = Column(String, nullable=True) # For Listening section
     image_url = Column(String, nullable=True) # For visual questions (Mondai 1, 2, etc.)
 
     # Relationships
     test = relationship("MockTest", back_populates="questions")
+
+class TeacherSettings(Base):
+    __tablename__ = "teacher_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    module_toggles = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="settings")
+
+class QuestionTemplate(Base):
+    __tablename__ = "question_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    name = Column(String)
+    level = Column(String)
+    section = Column(String)
+    questions = Column(JSON)
+    template_metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="templates")
+
+class LevelConfig(Base):
+    __tablename__ = "level_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    level = Column(String, unique=True)
+    duration = Column(Integer, default=120)
+    questions = Column(Integer, default=72)
+    pass_score = Column(Float, default=38.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class TestSession(Base):
     __tablename__ = "test_sessions"

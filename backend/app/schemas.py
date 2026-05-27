@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from typing import Any, List, Optional
 from datetime import datetime
 
 # --- User Schemas ---
@@ -27,8 +27,71 @@ class QuestionCreate(BaseModel):
     question_text: str
     options: List[str]
     correct_index: int
+    difficulty: Optional[str] = None
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = []
     audio_url: Optional[str] = None
     image_url: Optional[str] = None
+
+# --- AI Generation Schemas ---
+class AIGenerateContent(BaseModel):
+    vocabulary: Optional[str] = ''
+    grammar: Optional[str] = ''
+    reading: Optional[str] = ''
+
+class AIGenerateRequest(BaseModel):
+    level: str
+    section: str
+    count: int
+    question_types: List[str]
+    difficulty_mode: str
+    include_explanations: bool = True
+    prevent_duplicates: bool = True
+    tag_by_category: bool = True
+    content: AIGenerateContent
+
+class ListeningAudioRequest(BaseModel):
+    script: str
+    speaker_count: int = 1
+    voice_style: str = 'female'
+    speech_speed: str = 'standard'
+    generate_questions: bool = True
+    level: str = 'N5'
+    question_count: int = 5
+    section: str = 'listening'
+
+class QuestionTemplateCreate(BaseModel):
+    name: str
+    level: str
+    section: str
+    questions: List[QuestionCreate]
+    template_metadata: Optional[dict] = {}
+
+class QuestionTemplateResponse(BaseModel):
+    id: int
+    name: str
+    level: str
+    section: str
+    questions: List[QuestionCreate]
+    template_metadata: Optional[dict] = {}
+    created_at: datetime
+
+class TeacherSettingsUpdate(BaseModel):
+    module_toggles: dict
+
+class TeacherSettingsResponse(BaseModel):
+    user_id: int
+    module_toggles: dict
+    created_at: datetime
+
+class LevelConfigItem(BaseModel):
+    level: str
+    duration: int
+    questions: int
+    pass_score: float
+
+class LevelConfigResponse(BaseModel):
+    levels: List[LevelConfigItem]
 
 # --- Test Schemas ---
 class MockTestCreate(BaseModel):
@@ -45,6 +108,9 @@ class QuestionLearnerResponse(BaseModel):
     type: str
     question_text: str
     options: List[str]
+    difficulty: Optional[str] = None
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = []
     audio_url: Optional[str] = None
     image_url: Optional[str] = None
     audio_metadata: Optional[dict] = None
@@ -60,6 +126,9 @@ class QuestionResponse(BaseModel):
     question_text: str
     options: List[str]
     correct_index: int
+    difficulty: Optional[str] = None
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = []
     audio_url: Optional[str] = None
     image_url: Optional[str] = None
     audio_metadata: Optional[dict] = None

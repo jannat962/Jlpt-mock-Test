@@ -100,6 +100,9 @@ const Sidebar = ({ user, view, setView, isSidebarOpen, setIsSidebarOpen, handleL
               <button className={`nav-link ${view === 'admin-dashboard' ? 'active' : ''}`} onClick={() => { setView('admin-dashboard'); setIsSidebarOpen(false); }}>
                 <span className="icon">🛠️</span> Test Management
               </button>
+              <button className={`nav-link ${view === 'ai-generator' ? 'active' : ''}`} onClick={() => { setView('ai-generator'); setIsSidebarOpen(false); }}>
+                <span className="icon">🤖</span> AI Generator
+              </button>
             </>
           )}
         </div>
@@ -235,6 +238,384 @@ const Dashboard = ({ availableTests, startTest }) => (
     </div>
   </div>
 );
+
+const AIQuestionGenerator = ({ token, setView }) => {
+  const [activeTab, setActiveTab] = useState('Input');
+  const [level, setLevel] = useState('N3');
+  const [questionCount, setQuestionCount] = useState(12);
+  const [questionTypes, setQuestionTypes] = useState({ vocabulary: true, grammar: true, reading: true, listening: false });
+  const [difficultyMode, setDifficultyMode] = useState('auto-balanced');
+  const [contentBySection, setContentBySection] = useState({ vocabulary: '', grammar: '', reading: '' });
+  const [uploadSection, setUploadSection] = useState('vocabulary');
+  const [fileLabel, setFileLabel] = useState('No file selected');
+  const [generatedQuestions, setGeneratedQuestions] = useState([]);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [alertState, setAlertState] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const availableTypes = [
+    { key: 'vocabulary', label: 'Vocabulary' },
+    { key: 'grammar', label: 'Grammar' },
+    { key: 'reading', label: 'Reading' },
+    { key: 'listening', label: 'Listening' }
+  ];
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setFileLabel(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      if (!text) return;
+      const parsed = file.name.toLowerCase().endsWith('.json') ? JSON.stringify(JSON.parse(text), null, 2) : text;
+      setContentBySection((prev) => ({ ...prev, [uploadSection]: parsed }));
+    };
+    reader.readAsText(file);
+  };
+
+  const validate = () => {
+    const hasContent = Object.values(contentBySection).some((value) => value.trim());
+    if (!hasContent) {
+      setAlertState({ type: 'error', msg: 'Please add content for vocabulary, grammar, or reading before generating.' });
+      return false;
+    }
+    if (!Object.values(questionTypes).some(Boolean)) {
+      setAlertState({ type: 'error', msg: 'Select at least one question type.' });
+      return false;
+    }
+    if (questionCount < 5 || questionCount > 80) {
+      setAlertState({ type: 'error', msg: 'Question count should be between 5 and 80 for reliable generation.' });
+      return false;
+    }
+    return true;
+  };
+
+  const buildPayload = () => ({
+    level,
+    section: 'mixed',
+    count: questionCount,
+    question_types: Object.keys(questionTypes).filter((key) => questionTypes[key]),
+    difficulty_mode: difficultyMode,
+    include_explanations: true,
+    prevent_duplicates: true,
+    tag_by_category: true,
+    content: {
+      vocabulary: contentBySection.vocabulary.trim(),
+      grammar: contentBySection.grammar.trim(),
+      reading: contentBySection.reading.trim()
+    }
+  });
+
+  const handleGenerate = async () => {
+    if (!validate()) return;
+    setIsGenerating(true);
+    setAlertState(null);
+    setStatusMessage('Generating question set...');
+
+    try {
+      const res = await fetch(`${API_URL}/admin/ai/generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(buildPayload())
+      });
+
+      if (!res.ok) {
+        let errorData = { detail: 'Unknown backend error' };
+        try {
+          errorData = await res.json();
+        } catch (jsonErr) {
+          const text = await res.text().catch(() => 'Unknown backend error');
+          throw new Error(text || 'Failed to generate questions');
+        }
+        throw new Error(errorData.detail || errorData.message || 'Failed to generate questions');
+      }
+
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response from question generator');
+      }
+
+      const normalized = data.map((q, index) => ({
+        number: q.number || index + 1,
+        type: q.type || 'MCQ',
+        question_text: q.question_text || 'Generated question',
+        options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
+        correct_index: q.correct_answer_index ?? q.correct_index ?? 0,
+        difficulty: q.difficulty || 'medium',
+        explanation: q.explanation || '',
+        tags: q.tags || [],
+        engine: q.engine || 'AI Core',
+        source: q.engine || 'AI Core'
+      }));
+
+      const fallbackUsed = normalized.some((q) => q.engine === 'Local Engine Fallback');
+      setGeneratedQuestions(normalized);
+      setSaveStatus('');
+      setSaveTitle(`AI ${level} ${fallbackUsed ? 'Fallback' : 'Generated'} Set`);
+      setActiveTab('Preview');
+      setAlertState({ type: fallbackUsed ? 'warning' : 'success', msg: fallbackUsed ? 'The local fallback engine was used to keep generation unblocked.' : 'AI generation completed successfully.' });
+      setStatusMessage(fallbackUsed ? 'Local fallback generated the set.' : 'AI generated the set successfully.');
+    } catch (err) {
+      setAlertState({ type: 'error', msg: err.message });
+      setStatusMessage('Generation failed. You can still use the offline fallback below.');
+      setGeneratedQuestions([]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const renderBadge = (source) => {
+    const isFallback = source && source.toLowerCase().includes('local');
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.7rem', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700, background: isFallback ? '#fef3c7' : '#d1fae5', color: isFallback ? '#854d0e' : '#065f46', border: `1px solid ${isFallback ? '#fde68a' : '#a7f3d0'}` }}>
+        {isFallback ? '📦 Local Engine' : '⚡ AI Core'}
+      </span>
+    );
+  };
+
+  const saveGeneratedSet = async () => {
+    if (!generatedQuestions.length) {
+      setSaveStatus('Generate a question set before saving.');
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveStatus('');
+
+    try {
+      const typeToSection = (type) => {
+        const normalized = type?.toLowerCase() || '';
+        if (normalized.includes('listening')) return 4;
+        if (normalized.includes('grammar')) return 2;
+        if (normalized.includes('reading')) return 3;
+        return 1;
+      };
+
+      const payload = {
+        title: saveTitle || `AI ${level} Generated Set`,
+        level,
+        duration: Math.max(30, Math.min(180, Math.floor(questionCount * 1.2))),
+        questions: generatedQuestions.map((q, idx) => ({
+          section: typeToSection(q.type),
+          number: idx + 1,
+          type: q.type,
+          question_text: q.question_text,
+          options: q.options,
+          correct_answer_index: q.correct_index,
+          difficulty: q.difficulty,
+          explanation: q.explanation,
+          tags: q.tags,
+          audio_url: q.audio_url || null
+        }))
+      };
+
+      const res = await fetch(`${API_URL}/admin/ai/save-generated-set`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ detail: 'Unknown backend error' }));
+        throw new Error(errorData.detail || 'Failed to save generated set');
+      }
+
+      const saved = await res.json();
+      setSaveStatus(`Saved as test: ${saved.title || payload.title}`);
+    } catch (err) {
+      setSaveStatus(`Save failed: ${err.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  return (
+    <div className="main-content">
+      <div className="content-left">
+        <header className="header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1>AI Question Generator</h1>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+              Build mixed JLPT question sets with separate vocabulary, grammar, and reading syllabus inputs.
+            </p>
+          </div>
+          <button className="btn-nav" style={{ width: 'auto' }} onClick={() => setView('admin-dashboard')}>← Back</button>
+        </header>
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {['Input', 'Preview'].map((tab) => (
+              <button
+                key={tab}
+                className={`btn-nav ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+                style={{ minWidth: '120px' }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {alertState && (
+          <div className="widget" style={{ marginBottom: '1.5rem', background: alertState.type === 'error' ? '#fee2e2' : alertState.type === 'warning' ? '#fef9c3' : '#d1fae5', borderColor: alertState.type === 'error' ? '#fecaca' : alertState.type === 'warning' ? '#fcd34d' : '#86efac', color: alertState.type === 'error' ? '#991b1b' : alertState.type === 'warning' ? '#92400e' : '#064e3b' }}>
+            {alertState.msg}
+          </div>
+        )}
+
+        {activeTab === 'Input' ? (
+          <>
+            <div className="widget" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '1rem' }}>
+                <div>
+                  <label className="profile-label">JLPT Level</label>
+                  <select className="auth-input" value={level} onChange={(e) => setLevel(e.target.value)}>
+                    {['N5', 'N4', 'N3', 'N2', 'N1'].map((lvl) => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="profile-label">Question Count</label>
+                  <input type="number" className="auth-input" value={questionCount} min={5} max={80} onChange={(e) => setQuestionCount(parseInt(e.target.value, 10) || 0)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="widget" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="profile-label">Vocabulary Syllabus</label>
+                  <textarea className="auth-input" rows="6" value={contentBySection.vocabulary} onChange={(e) => setContentBySection({ ...contentBySection, vocabulary: e.target.value })} placeholder="Enter vocabulary list, kanji, or example words" />
+                </div>
+                <div>
+                  <label className="profile-label">Grammar Syllabus</label>
+                  <textarea className="auth-input" rows="6" value={contentBySection.grammar} onChange={(e) => setContentBySection({ ...contentBySection, grammar: e.target.value })} placeholder="Enter grammar patterns, particles, or example sentences" />
+                </div>
+              </div>
+            </div>
+
+            <div className="widget" style={{ marginBottom: '1.5rem' }}>
+              <label className="profile-label">Reading Syllabus</label>
+              <textarea className="auth-input" rows="6" value={contentBySection.reading} onChange={(e) => setContentBySection({ ...contentBySection, reading: e.target.value })} placeholder="Enter a short reading passage, comprehension checklist, or paragraph" />
+            </div>
+
+            <div className="widget" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label className="profile-label">Upload section content</label>
+                <select className="auth-input" value={uploadSection} onChange={(e) => setUploadSection(e.target.value)}>
+                  <option value="vocabulary">Vocabulary</option>
+                  <option value="grammar">Grammar</option>
+                  <option value="reading">Reading</option>
+                </select>
+                <input type="file" accept=".txt,.csv,.json" onChange={handleFileChange} style={{ marginTop: '0.75rem' }} />
+                <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{fileLabel}</p>
+              </div>
+              <div>
+                <label className="profile-label">Difficulty Mode</label>
+                <select className="auth-input" value={difficultyMode} onChange={(e) => setDifficultyMode(e.target.value)}>
+                  <option value="auto-balanced">Auto-balance</option>
+                  <option value="easy-only">Easy only</option>
+                  <option value="medium-only">Medium only</option>
+                  <option value="hard-only">Hard only</option>
+                </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1rem' }}>
+                  {availableTypes.map((type) => (
+                    <label key={type.key} className="checkbox-label">
+                      <input type="checkbox" checked={questionTypes[type.key]} onChange={() => setQuestionTypes((prev) => ({ ...prev, [type.key]: !prev[type.key] }))} />
+                      {type.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <button className="btn-primary" style={{ flex: 1, minWidth: '220px' }} onClick={handleGenerate} disabled={isGenerating}>
+                {isGenerating ? 'Generating…' : 'Generate Questions'}
+              </button>
+              <div style={{ flex: '1 1 320px', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-tertiary)', minHeight: '84px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  This AI generator uses structured input and a fallback engine to preserve workflow even when remote generation is unavailable.
+                </p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="widget" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700 }}>Preview Generator Output</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{generatedQuestions.length} questions available</div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="Generated set title"
+                  value={saveTitle}
+                  onChange={(e) => setSaveTitle(e.target.value)}
+                  style={{ minWidth: '240px', width: '260px' }}
+                />
+                <button className="btn-primary" style={{ width: 'auto' }} onClick={saveGeneratedSet} disabled={saveLoading || generatedQuestions.length === 0}>
+                  {saveLoading ? 'Saving…' : 'Save to Bank'}
+                </button>
+              </div>
+            </div>
+            {saveStatus && (
+              <div style={{ marginBottom: '1rem', color: saveStatus.startsWith('Save failed') ? '#b91c1c' : '#166534', fontSize: '0.9rem' }}>
+                {saveStatus}
+              </div>
+            )}
+
+            {generatedQuestions.length === 0 ? (
+              <div style={{ padding: '2rem', borderRadius: '16px', border: '1px dashed var(--border-tertiary)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No preview available yet. Generate a question set from the Input tab.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {generatedQuestions.map((question) => (
+                  <div key={question.number} className="widget" style={{ padding: '1rem', borderRadius: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                      <div>
+                        <div style={{ fontWeight: '700', marginBottom: '0.25rem' }}>Question {question.number}</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{question.type} • {question.difficulty}</div>
+                      </div>
+                      {renderBadge(question.source)}
+                    </div>
+                    <p style={{ marginBottom: '1rem', whiteSpace: 'pre-line' }}>{question.question_text}</p>
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      {question.options.map((option, idx) => (
+                        <div key={idx} style={{ padding: '0.85rem', borderRadius: '12px', border: idx === question.correct_index ? '1px solid #2563eb' : '1px solid #e2e8f0', background: idx === question.correct_index ? '#eff6ff' : '#ffffff' }}>
+                          <strong style={{ marginRight: '0.5rem' }}>{String.fromCharCode(65 + idx)}.</strong>{option}
+                        </div>
+                      ))}
+                    </div>
+                    {question.explanation && (
+                      <div style={{ marginTop: '1rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        <strong>Explanation:</strong> {question.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const AdminDashboard = ({ availableTests, createTest, editTest, deleteTest }) => (
   <div className="main-content">
@@ -962,7 +1343,7 @@ function App() {
         />
       )}
 
-      {['dashboard', 'admin-dashboard', 'test-editor', 'leaderboard'].includes(view) && (
+      {['dashboard', 'admin-dashboard', 'test-editor', 'leaderboard', 'ai-generator'].includes(view) && (
         <>
           <MobileHeader setIsSidebarOpen={setIsSidebarOpen} />
           <Sidebar 
@@ -978,6 +1359,7 @@ function App() {
 
       {view === 'dashboard' && <Dashboard availableTests={availableTests} startTest={startTest} />}
       {view === 'admin-dashboard' && <AdminDashboard availableTests={availableTests} createTest={createTest} editTest={editTest} deleteTest={deleteTest} />}
+      {view === 'ai-generator' && <AIQuestionGenerator token={token} setView={setView} />}
       {view === 'test-editor' && (
         <TestEditor 
           editingTest={editingTest} 

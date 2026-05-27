@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -10,7 +10,14 @@ router = APIRouter()
 security = HTTPBearer()
 
 @router.post("/signup", response_model=schemas.UserResponse)
-def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def signup(user: schemas.UserCreate, request: Request, db: Session = Depends(get_db)):
+    # Diagnostic logging: remote address + payload summary
+    try:
+        client = request.client.host if request and request.client else 'unknown'
+        print(f"[AUTH][SIGNUP] Incoming signup from {client}: email={user.email}")
+    except Exception:
+        print("[AUTH][SIGNUP] Incoming signup (could not read client info)")
+
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -27,7 +34,14 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), request: Request = None, db: Session = Depends(get_db)):
+    # Diagnostic logging: remote address + username
+    try:
+        client = request.client.host if request and request.client else 'unknown'
+        print(f"[AUTH][LOGIN] Incoming login from {client}: username={form_data.username}")
+    except Exception:
+        print("[AUTH][LOGIN] Incoming login (could not read client info)")
+
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not auth_utils.verify_password(form_data.password, user.password_hash):
         raise HTTPException(

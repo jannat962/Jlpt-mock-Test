@@ -124,3 +124,108 @@ class TestSessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- AI Generation Schemas ---
+class AIGenerateContent(BaseModel):
+    vocabulary: Optional[str] = ''
+    grammar: Optional[str] = ''
+    reading: Optional[str] = ''
+
+class AIGenerateRequest(BaseModel):
+    level: str
+    section: str = 'mixed'
+    count: int
+    question_types: List[str] = []
+    difficulty_mode: str = "auto-balanced"
+    include_explanations: bool = True
+    prevent_duplicates: bool = True
+    tag_by_category: bool = True
+    content: AIGenerateContent
+
+class GeneratedQuestion(BaseModel):
+    type: str
+    level: str
+    section: int
+    difficulty: str
+    question_text: str
+    options: List[str]
+    correct_answer_index: int
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+    class Config:
+        from_attributes = True
+
+class SaveGeneratedSetRequest(BaseModel):
+    title: str
+    level: str
+    duration: int
+    questions: List[GeneratedQuestion]
+
+# --- Listening Audio Generation Schemas ---
+class ListeningAudioGenerateRequest(BaseModel):
+    script: str
+    speaker_count: int = 1
+    voice_style: str = "female"
+    speech_speed: str = "standard"
+    generate_questions: bool = True
+    level: str = "N5"
+    question_count: int = 5
+    section: str = "listening"
+
+class ListeningAudioResponse(BaseModel):
+    audio_url: str
+    metadata: Optional[dict] = None
+    questions: Optional[List[GeneratedQuestion]] = None
+
+# --- Template Schemas ---
+class AITemplateCreate(BaseModel):
+    name: str
+    level: str
+    section: str
+    description: Optional[str] = None
+    questions: List[GeneratedQuestion]
+
+class AITemplateResponse(BaseModel):
+    id: int
+    name: str
+    level: str
+    section: str
+    description: Optional[str] = None
+    questions: List[GeneratedQuestion]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Module Settings Schemas ---
+class ModuleSettingsUpdate(BaseModel):
+    module_toggles: dict
+
+class ModuleSettingsResponse(BaseModel):
+    id: int
+    module_toggles: dict
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Level Configuration Schemas ---
+class LevelConfigUpdate(BaseModel):
+    level: str
+    duration: int
+    questions: int
+    pass_score: float
+
+class LevelConfigResponse(BaseModel):
+    id: int
+    level: str
+    duration: int
+    questions: int
+    pass_score: float
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

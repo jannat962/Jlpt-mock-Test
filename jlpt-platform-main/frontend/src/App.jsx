@@ -100,6 +100,21 @@ const Sidebar = ({ user, view, setView, isSidebarOpen, setIsSidebarOpen, handleL
               <button className={`nav-link ${view === 'admin-dashboard' ? 'active' : ''}`} onClick={() => { setView('admin-dashboard'); setIsSidebarOpen(false); }}>
                 <span className="icon">🛠️</span> Test Management
               </button>
+              <button className={`nav-link ${view === 'ai-generator' ? 'active' : ''}`} onClick={() => { setView('ai-generator'); setIsSidebarOpen(false); }}>
+                <span className="icon">🤖</span> AI Question Generator
+              </button>
+              <button className={`nav-link ${view === 'ai-listening' ? 'active' : ''}`} onClick={() => { setView('ai-listening'); setIsSidebarOpen(false); }}>
+                <span className="icon">🔊</span> AI Listening Generator
+              </button>
+              <button className={`nav-link ${view === 'module-settings' ? 'active' : ''}`} onClick={() => { setView('module-settings'); setIsSidebarOpen(false); }}>
+                <span className="icon">⚙️</span> Module Settings
+              </button>
+              <button className={`nav-link ${view === 'level-config' ? 'active' : ''}`} onClick={() => { setView('level-config'); setIsSidebarOpen(false); }}>
+                <span className="icon">📊</span> Level Configuration
+              </button>
+              <button className={`nav-link ${view === 'question-bank' ? 'active' : ''}`} onClick={() => { setView('question-bank'); setIsSidebarOpen(false); }}>
+                <span className="icon">📚</span> Question Bank
+              </button>
             </>
           )}
         </div>
@@ -536,6 +551,1011 @@ const TestEditor = ({ editingTest, setEditingTest, saveTest, setView, generateAu
             ))}
           </div>
         </section>
+      </div>
+    </div>
+  );
+};
+
+const AIQuestionGenerator = ({ token }) => {
+  const [step, setStep] = useState(1);
+  const [level, setLevel] = useState('N5');
+  const [activeSection, setActiveSection] = useState('vocabulary');
+  const [contentBySection, setContentBySection] = useState({ vocabulary: '', grammar: '', reading: '' });
+  const [fileLabel, setFileLabel] = useState('No file selected');
+  const [questionCount, setQuestionCount] = useState(10);
+  const [questionTypes, setQuestionTypes] = useState({ MCQ: true, 'fill-blank': false, matching: false, reading: false, listening: false });
+  const [difficultyMode, setDifficultyMode] = useState('auto-balanced');
+  const [options, setOptions] = useState({ explain: true, preventDuplicates: true, tagByCategory: true });
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const stepLabels = ['Input', 'Configure', 'Preview', 'Export'];
+
+  const questionTypeLabels = {
+    MCQ: 'MCQ',
+    'fill-blank': 'Fill in the blank',
+    matching: 'Matching',
+    reading: 'Reading passage',
+    listening: 'Listening'
+  };
+
+  const handleTypeToggle = (key) => {
+    setQuestionTypes(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const parseCsv = (text) => {
+    const rows = text.trim().split(/\r?\n/).filter(Boolean);
+    const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+    const contentLines = rows.slice(1).map(row => {
+      const cols = row.split(',').map(c => c.trim());
+      const entry = {};
+      headers.forEach((header, index) => {
+        entry[header] = cols[index] || '';
+      });
+      return JSON.stringify(entry);
+    });
+    return contentLines.join('\n');
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setFileLabel(file.name);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      if (!text) return;
+      let parsed = text;
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        parsed = parseCsv(text);
+      } else if (file.name.toLowerCase().endsWith('.json')) {
+        try {
+          const json = JSON.parse(text);
+          parsed = JSON.stringify(json, null, 2);
+        } catch (err) {
+          setError('Unable to parse JSON file. Please check the file format.');
+          return;
+        }
+      }
+      setContentBySection(prev => ({ ...prev, [activeSection]: parsed }));
+    };
+    reader.readAsText(file);
+  };
+
+  const validateGenerate = () => {
+    const hasSectionContent = Object.values(contentBySection).some((value) => value.trim());
+    if (!hasSectionContent) {
+      setError('Please paste or upload syllabus content for at least one section before generating.');
+      return false;
+    }
+    if (!Object.values(questionTypes).some(Boolean)) {
+      setError('Select at least one question type.');
+      return false;
+    }
+    if (questionCount < 5 || questionCount > 500) {
+      setError('Question count must be between 5 and 500.');
+      return false;
+    }
+    return true;
+  };
+
+  const sectionMap = {
+    vocabulary: 1,
+    grammar: 2,
+    reading: 3,
+    listening: 4
+  };
+
+  const saveGeneratedSet = async () => {
+    if (!questions.length) {
+      setSaveStatus('Generate a question set before saving.');
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveStatus('');
+
+    try {
+      const filledSections = Object.keys(contentBySection).filter((key) => contentBySection[key].trim());
+      const titleSection = filledSections.length === 1 ? filledSections[0] : 'Mixed';
+      const titleSectionLabel = titleSection.charAt(0).toUpperCase() + titleSection.slice(1);
+
+      const payload = {
+        title: saveTitle || `AI ${level.toUpperCase()} ${titleSectionLabel} Set`,
+        level,
+        duration: Math.max(30, Math.min(180, Math.floor(questionCount * 1.2))),
+        questions: questions.map((q, idx) => ({
+          number: idx + 1,
+          section: typeof q.section === 'number' ? q.section : sectionMap[q.section] || sectionMap[activeSection] || 1,
+          type: q.type || 'MCQ',
+          question_text: q.question_text,
+          options: q.options,
+          correct_index: q.correct_answer_index ?? q.correct_index,
+          difficulty: q.difficulty || 'medium',
+          explanation: q.explanation,
+          tags: q.tags || []
+        }))
+      };
+
+      const res = await fetch(`${API_URL}/admin/ai/save-generated-set`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to save generated set' }));
+        throw new Error(err.detail || 'Failed to save generated set');
+      }
+
+      setSaveStatus('AI-generated set saved successfully.');
+    } catch (err) {
+      console.error(err);
+      setSaveStatus(`Save failed: ${err.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const buildRequestPayload = () => ({
+    level,
+    section: 'mixed',
+    count: questionCount,
+    question_types: Object.keys(questionTypes).filter(key => questionTypes[key]),
+    difficulty_mode: difficultyMode,
+    include_explanations: options.explain,
+    prevent_duplicates: options.preventDuplicates,
+    tag_by_category: options.tagByCategory,
+    content: {
+      vocabulary: contentBySection.vocabulary.trim(),
+      grammar: contentBySection.grammar.trim(),
+      reading: contentBySection.reading.trim()
+    }
+  });
+
+  const handleGenerate = async () => {
+    if (!validateGenerate()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const payload = buildRequestPayload();
+      const res = await fetch(`${API_URL}/admin/ai/generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to generate questions' }));
+        throw new Error(err.detail || 'Failed to generate questions');
+      }
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Unexpected response from the AI service');
+      }
+      setQuestions(data);
+      setStep(3);
+      setEditingIndex(null);
+    } catch (err) {
+      console.error('AI generate error', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveQuestion = (idx) => {
+    setQuestions(prev => prev.filter((_, index) => index !== idx));
+  };
+
+  const handleEditQuestion = (idx, field, value) => {
+    setQuestions(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: value };
+      return copy;
+    });
+  };
+
+  const downloadFile = (filename, contentText) => {
+    const blob = new Blob([contentText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportJson = () => {
+    downloadFile(`jlpt-ai-questions-${level.toLowerCase()}.json`, JSON.stringify(questions, null, 2));
+  };
+
+  const exportCsv = () => {
+    const headers = ['id', 'type', 'level', 'section', 'difficulty', 'question_text', 'options', 'correct_answer_index', 'explanation', 'tags'];
+    const rows = questions.map((q) => [
+      q.id ?? '',
+      q.type,
+      q.level,
+      q.section,
+      q.difficulty,
+      `"${(q.question_text || '').replace(/"/g, '""')}"`,
+      `"${JSON.stringify(q.options || [])}"`,
+      q.correct_answer_index,
+      `"${(q.explanation || '').replace(/"/g, '""')}"`,
+      `"${JSON.stringify(q.tags || [])}"`
+    ].join(','));
+    downloadFile(`jlpt-ai-questions-${level.toLowerCase()}.csv`, [headers.join(','), ...rows].join('\n'));
+  };
+
+  const summary = {
+    total: questions.length,
+    easy: questions.filter(q => q.difficulty === 'easy').length,
+    medium: questions.filter(q => q.difficulty === 'medium').length,
+    hard: questions.filter(q => q.difficulty === 'hard').length,
+    bySection: questions.reduce((acc, q) => {
+      acc[q.section] = (acc[q.section] || 0) + 1;
+      return acc;
+    }, {})
+  };
+
+  return (
+    <div className="main-content">
+      <div className="content-left" style={{ paddingBottom: '4rem' }}>
+        <header className="header-section" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h1>AI Question Generator</h1>
+            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Generate JLPT question sets in bulk using AI and save them to your question bank.</p>
+          </div>
+        </header>
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {stepLabels.map((label, index) => (
+              <div key={label} style={{ flex: '1 1 130px', minWidth: '130px', padding: '0.9rem 1rem', borderRadius: '14px', border: step === index + 1 ? '1px solid var(--primary)' : '1px solid var(--border-tertiary)', background: step === index + 1 ? 'rgba(83, 74, 183, 0.08)' : 'white', color: step === index + 1 ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: step === index + 1 ? '700' : '500', textAlign: 'center' }}>
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <div className="widget" style={{ background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b', marginBottom: '1rem' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ marginBottom: '1rem' }}>Step 1 — Content Input</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem' }}>
+            <div>
+              <div className="form-group">
+                <label className="profile-label">JLPT Level</label>
+                <select className="auth-input" value={level} onChange={(e) => setLevel(e.target.value)}>
+                  <option value="N5">N5</option>
+                  <option value="N4">N4</option>
+                  <option value="N3">N3</option>
+                  <option value="N2">N2</option>
+                  <option value="N1">N1</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="profile-label">Upload content for</label>
+                <select className="auth-input" value={activeSection} onChange={(e) => setActiveSection(e.target.value)}>
+                  <option value="vocabulary">Vocabulary</option>
+                  <option value="grammar">Grammar</option>
+                  <option value="reading">Reading</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="profile-label">Vocabulary syllabus</label>
+                <textarea className="auth-input" rows="6" value={contentBySection.vocabulary} onChange={(e) => setContentBySection(prev => ({ ...prev, vocabulary: e.target.value }))} placeholder="Enter vocabulary syllabus content for this JLPT level..." />
+              </div>
+
+              <div className="form-group">
+                <label className="profile-label">Grammar syllabus</label>
+                <textarea className="auth-input" rows="6" value={contentBySection.grammar} onChange={(e) => setContentBySection(prev => ({ ...prev, grammar: e.target.value }))} placeholder="Enter grammar syllabus content for this JLPT level..." />
+              </div>
+
+              <div className="form-group">
+                <label className="profile-label">Reading syllabus</label>
+                <textarea className="auth-input" rows="6" value={contentBySection.reading} onChange={(e) => setContentBySection(prev => ({ ...prev, reading: e.target.value }))} placeholder="Enter reading syllabus content for this JLPT level..." />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="profile-label">Upload content file to active section</label>
+                <input type="file" accept=".txt,.csv,.json" onChange={handleFileChange} />
+                <div style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{fileLabel}</div>
+              </div>
+
+              <div className="card" style={{ padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-tertiary)' }}>
+                <h3 style={{ marginBottom: '0.75rem' }}>Quick tips</h3>
+                <ul style={{ listStyle: 'disc', paddingLeft: '1.2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  <li>Use plain text, CSV, or JSON.</li>
+                  <li>Keep prompts focused on the selected JLPT level.</li>
+                  <li>For listening, include dialogue or short spoken passages.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ marginBottom: '1rem' }}>Step 2 — Configuration</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="profile-label">Question count</label>
+              <input className="auth-input" type="number" min="5" max="500" value={questionCount} onChange={(e) => setQuestionCount(Math.max(5, Math.min(500, parseInt(e.target.value) || 5)))} />
+            </div>
+
+            <div className="form-group">
+              <label className="profile-label">Difficulty mode</label>
+              <select className="auth-input" value={difficultyMode} onChange={(e) => setDifficultyMode(e.target.value)}>
+                <option value="auto-balanced">Auto-balanced</option>
+                <option value="easy-only">Easy only</option>
+                <option value="medium-only">Medium only</option>
+                <option value="hard-only">Hard only</option>
+                <option value="fully-random">Fully random</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+            {Object.entries(questionTypeLabels).map(([key, label]) => (
+              <button key={key} type="button" className={`btn ${questionTypes[key] ? 'primary' : ''}`} onClick={() => handleTypeToggle(key)} style={{ textAlign: 'left' }}>
+                {questionTypes[key] ? '✔ ' : ''}{label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+            <label className="toggle-row"><span className="toggle-info"><p>Answer key + explanations</p></span><input type="checkbox" checked={options.explain} onChange={() => setOptions(prev => ({ ...prev, explain: !prev.explain }))} /></label>
+            <label className="toggle-row"><span className="toggle-info"><p>Prevent duplicate questions</p></span><input type="checkbox" checked={options.preventDuplicates} onChange={() => setOptions(prev => ({ ...prev, preventDuplicates: !prev.preventDuplicates }))} /></label>
+            <label className="toggle-row"><span className="toggle-info"><p>Tag by category</p></span><input type="checkbox" checked={options.tagByCategory} onChange={() => setOptions(prev => ({ ...prev, tagByCategory: !prev.tagByCategory }))} /></label>
+          </div>
+        </div>
+
+        <div className="widget" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ marginBottom: '0.5rem' }}>Ready to generate?</h2>
+            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>The AI will produce a structured question list you can review and export.</p>
+          </div>
+          <button className="btn-primary" type="button" style={{ minWidth: '180px' }} onClick={handleGenerate} disabled={loading}>
+            {loading ? 'Generating…' : 'Generate Questions'}
+          </button>
+        </div>
+
+        {questions.length > 0 && (
+          <div className="widget" style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(100px, 1fr))', gap: '0.75rem' }}>
+              <div className="card" style={{ padding: '1rem' }}><div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{summary.total}</div><div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Total questions</div></div>
+              <div className="card" style={{ padding: '1rem' }}><div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{summary.easy}</div><div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Easy</div></div>
+              <div className="card" style={{ padding: '1rem' }}><div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{summary.medium}</div><div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Medium</div></div>
+              <div className="card" style={{ padding: '1rem' }}><div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{summary.hard}</div><div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Hard</div></div>
+            </div>
+          </div>
+        )}
+
+        {questions.length > 0 && (
+          <div className="widget" style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ margin: 0 }}>Step 3 — Preview</h2>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn" onClick={exportJson}>Export JSON</button>
+                <button className="btn" onClick={exportCsv}>Export CSV</button>
+                <button className="btn-primary" onClick={saveGeneratedSet} disabled={saveLoading}>{saveLoading ? 'Saving…' : 'Save to Question Bank'}</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+              <input className="auth-input" placeholder="Generated set title" value={saveTitle} onChange={(e) => setSaveTitle(e.target.value)} style={{ flex: '1 1 320px' }} />
+              {saveStatus && <p style={{ color: saveStatus.startsWith('Save failed') ? '#b91c1c' : '#166534', margin: 0, alignSelf: 'center' }}>{saveStatus}</p>}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+              {questions.map((q, idx) => (
+                <div key={`ai-q-${idx}`} className="widget" style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontWeight: '800', marginBottom: '0.25rem' }}>{q.type || 'MCQ'}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{q.difficulty || 'medium'} • {q.section ?? activeSection}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button className="btn" style={{ padding: '0.45rem 0.8rem' }} onClick={() => setEditingIndex(idx)}>Edit</button>
+                      <button className="btn" style={{ padding: '0.45rem 0.8rem', borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleRemoveQuestion(idx)}>Remove</button>
+                    </div>
+                  </div>
+
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '0.75rem' }}>{q.question_text}</div>
+                  {q.options?.length > 0 && (
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {q.options.map((opt, optIdx) => (
+                        <div key={optIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ width: '22px', height: '22px', borderRadius: '999px', background: q.correct_answer_index === optIdx ? '#4338ca' : '#e2e8f0', color: q.correct_answer_index === optIdx ? 'white' : '#334155', display: 'grid', placeItems: 'center', fontSize: '0.75rem' }}>{String.fromCharCode(65 + optIdx)}</div>
+                          <div>{opt}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {editingIndex === idx && (
+                    <div style={{ marginTop: '1rem', padding: '0.9rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <label className="profile-label">Edit question text</label>
+                      <textarea className="auth-input" rows="3" value={q.question_text} onChange={(e) => handleEditQuestion(idx, 'question_text', e.target.value)} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
+                        {q.options?.map((opt, optIdx) => (
+                          <div key={optIdx}>
+                            <label className="profile-label">Option {optIdx + 1}</label>
+                            <input className="auth-input" value={opt} onChange={(e) => {
+                              const newOpts = [...(q.options || [])];
+                              newOpts[optIdx] = e.target.value;
+                              handleEditQuestion(idx, 'options', newOpts);
+                            }} />
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        <button className="btn" onClick={() => setEditingIndex(null)}>Close</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AIListeningGenerator = ({ token }) => {
+  const [script, setScript] = useState('');
+  const [speakerCount, setSpeakerCount] = useState(1);
+  const [voiceStyle, setVoiceStyle] = useState('female');
+  const [speechSpeed, setSpeechSpeed] = useState('standard');
+  const [level, setLevel] = useState('N5');
+  const [questionCount, setQuestionCount] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveDuration, setSaveDuration] = useState(120);
+  const [saveStatus, setSaveStatus] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateStatus, setTemplateStatus] = useState('');
+  const [templateLoading, setTemplateLoading] = useState(false);
+
+  const getFullAudioUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_URL.replace('/api', '')}${url}`;
+  };
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    try {
+      const payload = { script, speaker_count: speakerCount, voice_style: voiceStyle, speech_speed: speechSpeed, generate_questions: true, level, question_count: questionCount, section: 'listening' };
+      const res = await fetch(`${API_URL}/admin/listening/generate-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to generate audio' }));
+        throw new Error(err.detail || 'Failed to generate audio');
+      }
+      const data = await res.json();
+      setResult(data);
+      setSaveTitle(`AI Listening Set ${level}`);
+      setSaveDuration(level === 'N5' || level === 'N4' ? 110 : level === 'N3' ? 140 : level === 'N2' ? 155 : 170);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSet = async () => {
+    if (!result || !result.questions?.length) {
+      setSaveStatus('Generate audio and questions before saving.');
+      return;
+    }
+    setSaveLoading(true);
+    setSaveStatus('');
+    try {
+      const payload = {
+        title: saveTitle || `AI Listening Set ${new Date().toISOString()}`,
+        level,
+        duration: saveDuration,
+        questions: result.questions.map((q, idx) => ({
+          number: idx + 1,
+          section: 2,
+          type: 'Listening',
+          question_text: q.question_text,
+          options: q.options,
+          correct_index: q.correct_answer_index,
+          difficulty: q.difficulty,
+          explanation: q.explanation,
+          tags: q.tags || [],
+          audio_url: result.audio_url
+        }))
+      };
+      const res = await fetch(`${API_URL}/admin/ai/save-generated-set`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to save generated set' }));
+        throw new Error(err.detail || 'Failed to save generated set');
+      }
+      setSaveStatus('Saved to your question bank successfully.');
+    } catch (err) {
+      console.error(err);
+      setSaveStatus(`Save failed: ${err.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!result || !result.questions?.length) {
+      setTemplateStatus('Generate audio and questions before saving a template.');
+      return;
+    }
+    if (!templateName.trim()) {
+      setTemplateStatus('Enter a template name.');
+      return;
+    }
+    setTemplateLoading(true);
+    setTemplateStatus('');
+    try {
+      const payload = {
+        name: templateName,
+        level,
+        section: 'listening',
+        description: `AI-generated listening template for ${level} level`,
+        questions: result.questions.map((q) => ({
+          type: 'Listening',
+          level,
+          section: 2,
+          difficulty: q.difficulty,
+          question_text: q.question_text,
+          options: q.options,
+          correct_answer_index: q.correct_answer_index,
+          explanation: q.explanation,
+          tags: q.tags || []
+        }))
+      };
+      const res = await fetch(`${API_URL}/admin/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to save template' }));
+        throw new Error(err.detail || 'Failed to save template');
+      }
+      setTemplateStatus('Template saved successfully.');
+      setTemplateName('');
+    } catch (err) {
+      console.error(err);
+      setTemplateStatus(`Template save failed: ${err.message}`);
+    } finally {
+      setTemplateLoading(false);
+    }
+  };
+
+  return (
+    <div className="main-content">
+      <div className="content-left">
+        <header className="header-section" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h1>AI Listening Generator</h1>
+            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Generate listening audio and comprehension questions from a Japanese script.</p>
+          </div>
+        </header>
+
+        {error && (
+          <div className="widget" style={{ background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b', marginBottom: '1rem' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label className="profile-label">JLPT Level</label>
+              <select className="auth-input" value={level} onChange={(e) => setLevel(e.target.value)}>
+                <option value="N5">N5</option>
+                <option value="N4">N4</option>
+                <option value="N3">N3</option>
+                <option value="N2">N2</option>
+                <option value="N1">N1</option>
+              </select>
+            </div>
+            <div>
+              <label className="profile-label">Question count</label>
+              <input className="auth-input" type="number" min="3" max="10" value={questionCount} onChange={(e) => setQuestionCount(Math.max(3, Math.min(10, parseInt(e.target.value) || 3)))} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+            <div>
+              <label className="profile-label">Speakers</label>
+              <select className="auth-input" value={speakerCount} onChange={(e) => setSpeakerCount(parseInt(e.target.value))}>
+                <option value={1}>1 speaker</option>
+                <option value={2}>2 speakers</option>
+                <option value={3}>Group</option>
+              </select>
+            </div>
+            <div>
+              <label className="profile-label">Voice style</label>
+              <select className="auth-input" value={voiceStyle} onChange={(e) => setVoiceStyle(e.target.value)}>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+            <div>
+              <label className="profile-label">Speech speed</label>
+              <select className="auth-input" value={speechSpeed} onChange={(e) => setSpeechSpeed(e.target.value)}>
+                <option value="slow">Slow</option>
+                <option value="standard">Standard</option>
+                <option value="fast">Fast</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginTop: '1rem' }}>
+            <label className="profile-label">Japanese dialogue or monologue script</label>
+            <textarea className="auth-input" rows="8" value={script} onChange={(e) => setScript(e.target.value)} placeholder="Paste the Japanese script here..." />
+          </div>
+
+          <button className="btn-primary" style={{ width: 'auto', marginTop: '1rem' }} onClick={handleGenerate} disabled={loading}>
+            {loading ? 'Generating audio…' : 'Generate Listening Audio'}
+          </button>
+        </div>
+
+        {result && (
+          <div className="widget" style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ marginBottom: '1rem' }}>Generated audio</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <audio controls src={getFullAudioUrl(result.audio_url)} style={{ width: '100%' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="card"><div style={{ fontWeight: '700' }}>{result.metadata?.voice_style}</div><div style={{ color: 'var(--text-secondary)' }}>Voice style</div></div>
+              <div className="card"><div style={{ fontWeight: '700' }}>{result.metadata?.speech_speed}</div><div style={{ color: 'var(--text-secondary)' }}>Speed</div></div>
+              <div className="card"><div style={{ fontWeight: '700' }}>{result.metadata?.speaker_count}</div><div style={{ color: 'var(--text-secondary)' }}>Speakers</div></div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>Generated questions</h3>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {result.questions.map((q, idx) => (
+                  <div key={idx} className="card" style={{ padding: '0.9rem' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '0.35rem' }}>Question {idx + 1}</div>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{q.question_text}</div>
+                    {q.options?.map((opt, optIdx) => (
+                      <div key={optIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '999px', background: q.correct_answer_index === optIdx ? '#4338ca' : '#e2e8f0', color: q.correct_answer_index === optIdx ? 'white' : '#334155', display: 'grid', placeItems: 'center', fontSize: '0.78rem' }}>{String.fromCharCode(65 + optIdx)}</div>
+                        <div>{opt}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: '1 1 320px' }}>
+                <label className="profile-label">Save set title</label>
+                <input className="auth-input" value={saveTitle} onChange={(e) => setSaveTitle(e.target.value)} />
+              </div>
+              <div style={{ flex: '0 0 140px' }}>
+                <label className="profile-label">Duration (min)</label>
+                <input className="auth-input" type="number" value={saveDuration} onChange={(e) => setSaveDuration(parseInt(e.target.value) || 120)} />
+              </div>
+              <button className="btn-primary" onClick={handleSaveSet} disabled={saveLoading}>{saveLoading ? 'Saving…' : 'Save to Question Bank'}</button>
+            </div>
+            {saveStatus && <p style={{ marginTop: '0.75rem', color: saveStatus.startsWith('Save failed') ? '#b91c1c' : '#166534' }}>{saveStatus}</p>}
+
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-tertiary)' }}>
+              <h3 style={{ marginBottom: '1rem' }}>Or save as template</h3>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: '1 1 320px' }}>
+                  <label className="profile-label">Template name</label>
+                  <input className="auth-input" value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="e.g., Restaurant Conversation N4" />
+                </div>
+                <button className="btn" onClick={handleSaveTemplate} disabled={templateLoading}>{templateLoading ? 'Saving…' : 'Save as Template'}</button>
+              </div>
+              {templateStatus && <p style={{ marginTop: '0.75rem', color: templateStatus.startsWith('Template save failed') ? '#b91c1c' : '#166534' }}>{templateStatus}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ModuleSettings = ({ token }) => {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_URL}/admin/settings`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed to load settings');
+        const data = await res.json();
+        setSettings(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, [token]);
+
+  const toggle = (key) => {
+    setSettings((prev) => ({
+      ...prev,
+      module_toggles: {
+        ...prev.module_toggles,
+        [key]: !prev.module_toggles[key]
+      }
+    }));
+  };
+
+  const save = async () => {
+    if (!settings) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/admin/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ module_toggles: settings.module_toggles })
+      });
+      if (!res.ok) throw new Error('Failed to save settings');
+      setSaved('Settings saved successfully.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !settings) return <div className="main-content"><div className="widget">Loading settings...</div></div>;
+  if (error) return <div className="main-content"><div className="widget" style={{ background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b' }}>{error}</div></div>;
+
+  return (
+    <div className="main-content">
+      <div className="content-left">
+        <header className="header-section" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h1>Module Settings</h1>
+            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Enable or disable teacher and student features individually.</p>
+          </div>
+        </header>
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          {Object.entries(settings?.module_toggles || {}).map(([key, value]) => (
+            <div key={key} className="toggle-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="toggle-info">
+                <p style={{ margin: 0, fontWeight: '600', textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}</p>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Toggle {key.replace(/_/g, ' ')}</span>
+              </div>
+              <label className="toggle">
+                <input type="checkbox" checked={value} onChange={() => toggle(key)} />
+                <span className="slider"></span>
+              </label>
+            </div>
+          ))}
+
+          <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={save}>Save Module Settings</button>
+          {saved && <p style={{ marginTop: '0.75rem', color: '#166534' }}>{saved}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LevelConfiguration = ({ token }) => {
+  const [levels, setLevels] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+
+  useEffect(() => {
+    const fetchLevels = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_URL}/admin/levels`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed to load level settings');
+        const data = await res.json();
+        setLevels(data.levels || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLevels();
+  }, [token]);
+
+  const updateLevel = (idx, field, value) => {
+    setLevels((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: value };
+      return copy;
+    });
+  };
+
+  const save = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/admin/levels`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(levels)
+      });
+      if (!res.ok) throw new Error('Failed to save level settings');
+      const data = await res.json();
+      setLevels(data.levels || []);
+      setSaved('Level configuration saved successfully.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !levels.length) return <div className="main-content"><div className="widget">Loading level configuration...</div></div>;
+  if (error) return <div className="main-content"><div className="widget" style={{ background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b' }}>{error}</div></div>;
+
+  return (
+    <div className="main-content">
+      <div className="content-left">
+        <header className="header-section" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h1>Level Configuration</h1>
+            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Override duration, question count, and pass score for each JLPT level.</p>
+          </div>
+        </header>
+
+        <div className="widget" style={{ display: 'grid', gap: '1rem' }}>
+          {levels.map((item, idx) => (
+            <div key={item.level} className="card" style={{ padding: '1rem' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>{item.level}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="profile-label">Duration (min)</label>
+                  <input className="auth-input" type="number" value={item.duration} onChange={(e) => updateLevel(idx, 'duration', parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <label className="profile-label">Questions</label>
+                  <input className="auth-input" type="number" value={item.questions} onChange={(e) => updateLevel(idx, 'questions', parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <label className="profile-label">Pass score (%)</label>
+                  <input className="auth-input" type="number" value={item.pass_score} onChange={(e) => updateLevel(idx, 'pass_score', parseFloat(e.target.value) || 0)} />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button className="btn-primary" onClick={save}>Save Level Configuration</button>
+          {saved && <p style={{ marginTop: '0.75rem', color: '#166534' }}>{saved}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const QuestionBank = ({ token, availableTests }) => {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_URL}/admin/templates`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Unable to load templates');
+        const data = await res.json();
+        setTemplates(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTemplates();
+  }, [token]);
+
+  const deleteTemplate = async (id) => {
+    if (!window.confirm('Delete this template?')) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/templates/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Unable to delete template');
+      setTemplates((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="main-content">
+      <div className="content-left">
+        <header className="header-section" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h1>Question Bank</h1>
+            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>View saved test sets and templates in your account.</p>
+          </div>
+        </header>
+
+        <div className="widget" style={{ marginBottom: '1.5rem' }}>
+          <h2>Saved Tests</h2>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {availableTests.map((test) => (
+              <div key={test.id} className="card" style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '700' }}>{test.title}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{test.level} • {test.duration} min</div>
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>{test.questions?.length || 0} Qs</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="widget">
+          <h2>Saved Templates</h2>
+          {loading && <p>Loading templates…</p>}
+          {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {templates.map((template) => (
+              <div key={template.id} className="card" style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '700' }}>{template.name}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{template.level} • {template.questions?.length || 0} questions</div>
+                  </div>
+                  <button className="btn-nav" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={() => deleteTemplate(template.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+            {!loading && templates.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>No templates saved yet.</p>}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -983,7 +2003,7 @@ function App() {
         />
       )}
 
-      {['dashboard', 'admin-dashboard', 'test-editor', 'leaderboard'].includes(view) && (
+      {['dashboard', 'admin-dashboard', 'test-editor', 'leaderboard', 'ai-generator'].includes(view) && (
         <>
           <MobileHeader setIsSidebarOpen={setIsSidebarOpen} />
           <Sidebar 
@@ -999,6 +2019,11 @@ function App() {
 
       {view === 'dashboard' && <Dashboard availableTests={availableTests} startTest={startTest} />}
       {view === 'admin-dashboard' && <AdminDashboard availableTests={availableTests} createTest={createTest} editTest={editTest} deleteTest={deleteTest} />}
+      {view === 'ai-generator' && <AIQuestionGenerator token={token} />}
+      {view === 'ai-listening' && <AIListeningGenerator token={token} />}
+      {view === 'module-settings' && <ModuleSettings token={token} />}
+      {view === 'level-config' && <LevelConfiguration token={token} />}
+      {view === 'question-bank' && <QuestionBank token={token} availableTests={availableTests} />}
       {view === 'test-editor' && (
         <TestEditor 
           editingTest={editingTest} 

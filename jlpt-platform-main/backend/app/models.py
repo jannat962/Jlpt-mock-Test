@@ -74,3 +74,36 @@ class UserAnswer(Base):
 
     # Relationships
     session = relationship("TestSession", back_populates="answers")
+
+class AITemplate(Base):
+    __tablename__ = "ai_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    level = Column(String)  # N5, N4, N3, N2, N1
+    section = Column(String)  # vocabulary, grammar, reading, listening
+    description = Column(String, nullable=True)
+    questions = Column(JSON)  # Stores template questions
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ModuleSettings(Base):
+    __tablename__ = "module_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ai_generator_enabled = Column(Boolean, default=True)
+    listening_generator_enabled = Column(Boolean, default=True)
+    template_save_enabled = Column(Boolean, default=True)
+    question_bank_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class LevelConfiguration(Base):
+    __tablename__ = "level_configurations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    level = Column(String, unique=True, index=True)  # N5, N4, N3, N2, N1
+    duration = Column(Integer)  # in minutes
+    questions = Column(Integer)
+    pass_score = Column(Float)  # percentage
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
