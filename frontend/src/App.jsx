@@ -1147,24 +1147,26 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(authForm)
       });
-      
-      const contentType = res.headers.get("content-type");
-      let data = {};
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(`Server Error: ${res.status} ${res.statusText}`);
-      }
 
-      if (!res.ok) throw new Error(data.detail || "Signup failed");
-      alert("Account created! Please login.");
+      const data = await parseJsonResponse(res).catch(async () => {
+        const text = await res.text().catch(() => 'No response body');
+        throw new Error(`Signup failed: ${res.status} ${res.statusText} - ${text}`);
+      });
+
+      if (!res.ok) throw new Error(data.detail || data.message || 'Signup failed');
+      alert('Account created! Please login.');
       setView('login');
-    } catch (err) { alert(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -1177,25 +1179,27 @@ function App() {
 
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
         body: formData
       });
-      
-      const contentType = res.headers.get("content-type");
-      let data = {};
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        throw new Error(`Server Error: ${res.status} ${res.statusText}`);
-      }
 
-      if (!res.ok) throw new Error(data.detail || "Invalid credentials");
-      
+      const data = await parseJsonResponse(res).catch(async () => {
+        const text = await res.text().catch(() => 'No response body');
+        throw new Error(`Login failed: ${res.status} ${res.statusText} - ${text}`);
+      });
+
+      if (!res.ok) throw new Error(data.detail || data.message || 'Invalid credentials');
       setToken(data.access_token);
       setUser(data.user);
       setView(data.user.role === 'teacher' ? 'admin-dashboard' : 'dashboard');
-    } catch (err) { alert(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {

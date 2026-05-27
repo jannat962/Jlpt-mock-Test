@@ -33,6 +33,10 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 30
       
+      # Frontend URL for CORS and callback configuration
+      - key: FRONTEND_URL
+        value: https://jlpt-mock-test.vercel.app
+      
       # Suppress uv hardlink warning by using copy mode
       - key: UV_LINK_MODE
         value: copy

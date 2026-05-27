@@ -124,26 +124,23 @@ if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-# Configure CORS — allow localhost for dev and Vercel for production
+# Configure CORS — allow localhost for dev and the Vercel frontend host
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://jlpt-platform.vercel.app",
     "https://jlpt-mock-test.vercel.app",
-    "https://jlpt-platform-git-main-jannat962s-projects.vercel.app", # Example preview URL
 ]
 
 frontend_url = os.getenv("FRONTEND_URL", "").strip()
 if frontend_url:
     origins.append(frontend_url)
 
-# Add a more permissive check for Vercel preview branches if needed
-# Note: Wildcards with allow_credentials=True are strictly regulated by browsers
-
+# Add a permissive pattern for any Vercel preview branch
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Allowed for credentials
-    allow_origin_regex=r"https://.*\.vercel\.app", # Support all Vercel previews
+    allow_origins=origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
