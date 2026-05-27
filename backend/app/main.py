@@ -129,9 +129,13 @@ origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://jlpt-platform.vercel.app",
+    "https://jlpt-mock-test.vercel.app",
     "https://jlpt-platform-git-main-jannat962s-projects.vercel.app", # Example preview URL
-    os.getenv("FRONTEND_URL", ""),
 ]
+
+frontend_url = os.getenv("FRONTEND_URL", "").strip()
+if frontend_url:
+    origins.append(frontend_url)
 
 # Add a more permissive check for Vercel preview branches if needed
 # Note: Wildcards with allow_credentials=True are strictly regulated by browsers
@@ -139,7 +143,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # Allowed for credentials
-    allow_origin_regex=r"https://jlpt-platform.*\.vercel\.app", # Support all Vercel previews
+    allow_origin_regex=r"https://.*\.vercel\.app", # Support all Vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

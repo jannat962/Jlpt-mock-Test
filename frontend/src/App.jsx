@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.PROD ? 'https://jlpt-platform-backend.onrender.com/api' : '/api');
+const API_URL = import.meta.env.VITE_API_URL?.trim() || '/api';
 
 const parseJsonResponse = async (res) => {
   const text = await res.text();
