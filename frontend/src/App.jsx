@@ -1,7 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.PROD ? 'https://jlpt-platform-backend.onrender.com/api' : '/api');
+
+const parseJsonResponse = async (res) => {
+  const text = await res.text();
+  const contentType = res.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON response from API (${res.status}): ${text.slice(0, 200)}`);
+    }
+  }
+
+  throw new Error(`Unexpected API response (${res.status} ${res.statusText}): ${text.slice(0, 200)}`);
+};
 
 // --- Error Boundary Component ---
 class ErrorBoundary extends React.Component {
@@ -327,19 +342,13 @@ const AIQuestionGenerator = ({ token, setView }) => {
       });
 
       if (!res.ok) {
-        let errorData = { detail: 'Unknown backend error' };
-        try {
-          errorData = await res.json();
-        } catch (jsonErr) {
-          const text = await res.text().catch(() => 'Unknown backend error');
-          throw new Error(text || 'Failed to generate questions');
-        }
-        throw new Error(errorData.detail || errorData.message || 'Failed to generate questions');
+        const errorData = await parseJsonResponse(res).catch(() => ({ detail: `Failed to generate questions (${res.status})` }));
+        throw new Error(errorData.detail || errorData.message || `Failed to generate questions (${res.status})`);
       }
 
-      const data = await res.json();
+      const data = await parseJsonResponse(res);
       if (!Array.isArray(data)) {
-        throw new Error('Invalid response from question generator');
+        throw new Error(`Invalid response from question generator: ${JSON.stringify(data).slice(0, 200)}`);
       }
 
       const normalized = data.map((q, index) => ({
@@ -426,11 +435,11 @@ const AIQuestionGenerator = ({ token, setView }) => {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ detail: 'Unknown backend error' }));
-        throw new Error(errorData.detail || 'Failed to save generated set');
+        const errorData = await parseJsonResponse(res).catch(() => ({ detail: `Failed to save generated set (${res.status})` }));
+        throw new Error(errorData.detail || errorData.message || `Failed to save generated set (${res.status})`);
       }
 
-      const saved = await res.json();
+      const saved = await parseJsonResponse(res);
       setSaveStatus(`Saved as test: ${saved.title || payload.title}`);
     } catch (err) {
       setSaveStatus(`Save failed: ${err.message}`);

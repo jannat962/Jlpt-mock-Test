@@ -1,7 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.PROD ? 'https://jlpt-platform-backend.onrender.com/api' : '/api');
+
+const parseJsonResponse = async (res) => {
+  const text = await res.text();
+  const contentType = res.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON response from API (${res.status}): ${text.slice(0, 200)}`);
+    }
+  }
+
+  throw new Error(`Unexpected API response (${res.status} ${res.statusText}): ${text.slice(0, 200)}`);
+};
 
 // --- Error Boundary Component ---
 class ErrorBoundary extends React.Component {
@@ -690,8 +705,8 @@ const AIQuestionGenerator = ({ token }) => {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to save generated set' }));
-        throw new Error(err.detail || 'Failed to save generated set');
+        const err = await parseJsonResponse(res).catch(() => ({ detail: `Failed to save generated set (${res.status})` }));
+        throw new Error(err.detail || err.message || `Failed to save generated set (${res.status})`);
       }
 
       setSaveStatus('AI-generated set saved successfully.');
@@ -734,12 +749,12 @@ const AIQuestionGenerator = ({ token }) => {
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to generate questions' }));
-        throw new Error(err.detail || 'Failed to generate questions');
+        const err = await parseJsonResponse(res).catch(() => ({ detail: `Failed to generate questions (${res.status})` }));
+        throw new Error(err.detail || err.message || `Failed to generate questions (${res.status})`);
       }
-      const data = await res.json();
+      const data = await parseJsonResponse(res);
       if (!Array.isArray(data)) {
-        throw new Error('Unexpected response from the AI service');
+        throw new Error(`Unexpected response from the AI service: ${JSON.stringify(data).slice(0, 200)}`);
       }
       setQuestions(data);
       setStep(3);
