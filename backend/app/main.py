@@ -1,0 +1,184 @@
+import os
+import logging
+import traceback
+import time
+from contextlib import asynccontextmanager
+from sqlalchemy import inspect, text
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from . import models
+from .database import engine, SessionLocal
+from .routers import exam, admin, auth
+from .models import User, Question
+from .auth_utils import hash_password
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create tables and auto-seed
+    print("[STARTUP] Initializing database...")
+    retry_count = 0
+    max_retries = 3
+    def ensure_question_columns():
+        inspector = inspect(engine)
+        if 'questions' not in inspector.get_table_names():
+            return
+
+        existing_columns = [col['name'] for col in inspector.get_columns('questions')]
+        alter_commands = []
+        if 'difficulty' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN difficulty VARCHAR NULL')
+        if 'explanation' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN explanation VARCHAR NULL')
+        if 'tags' not in existing_columns:
+            alter_commands.append('ALTER TABLE questions ADD COLUMN tags JSON NULL')
+
+        if alter_commands:
+            with engine.begin() as conn:
+                for sql in alter_commands:
+                    print(f"[STARTUP] Applying DB schema change: {sql}")
+                    conn.execute(text(sql))
+
+    while retry_count < max_retries:
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            ensure_question_columns()
+            print("[STARTUP] Database tables verified.")
+            auto_seed()
+            sync_sequences()
+            break
+        except Exception as e:
+            retry_count += 1
+            print(f"[STARTUP] Initialization attempt {retry_count} failed: {e}")
+            if retry_count < max_retries:
+                import time
+                time.sleep(2)
+            else:
+                print("[STARTUP] CRITICAL: Database initialization failed after multiple attempts.")
+    yield
+
+app = FastAPI(
+    title="JLPT N4 Mock Test API", 
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log the full stack trace for debugging production 500 errors
+    error_msg = f"Internal Server Error: {str(exc)}"
+    print(f"[ERROR] {error_msg}")
+    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": error_msg}
+    )
+
+def auto_seed():
+    db = SessionLocal()
+    try:
+        # Check if user exists
+        if not db.query(models.User).filter(models.User.email == "test@example.com").first():
+            print("Auto-seeding: Creating test user...")
+            test_user = models.User(
+                name="Test User", email="test@example.com", 
+                password_hash=hash_password("test123"), role="learner", readiness_score=0.0,
+                is_email_verified=True
+            )
+            db.add(test_user)
+            db.commit()
+        
+        # Check if any tests exist
+        if db.query(models.MockTest).count() == 0:
+            print("Auto-seeding: Creating sample test...")
+            sample_test = models.MockTest(
+                title="Sample Mock Exam #1", level="N4", duration=120
+            )
+            db.add(sample_test)
+            db.commit()
+
+        # Check if any questions exist
+        if db.query(models.Question).count() == 0:
+            print("Auto-seeding: Creating sample questions...")
+            sample_q = models.Question(
+                test_id=1, section=0, number=1, type="Mondai 1",
+                question_text="Kore wa ... desu.",
+                options=["A", "B", "C", "D"], correct_index=0
+            )
+            db.add(sample_q)
+            db.commit()
+            print("Sample data created.")
+            
+    except Exception as e:
+        print(f"Auto-seed failed: {e}")
+    finally:
+        db.close()
+
+def sync_postgres_sequence(conn, table, column):
+    try:
+        conn.execute(text(
+            f"SELECT setval(pg_get_serial_sequence('{table}', '{column}'), COALESCE((SELECT MAX({column}) FROM {table}), 1), true)"
+        ))
+    except Exception as exc:
+        print(f"[STARTUP] Could not sync sequence for {table}.{column}: {exc}")
+
+def sync_sequences():
+    with engine.begin() as conn:
+        for table, column in [
+            ('mock_tests', 'id'),
+            ('questions', 'id'),
+            ('users', 'id'),
+            ('test_sessions', 'id'),
+            ('user_answers', 'id'),
+            ('question_templates', 'id'),
+            ('teacher_settings', 'id'),
+            ('level_configs', 'id')
+        ]:
+            sync_postgres_sequence(conn, table, column)
+
+from fastapi.staticfiles import StaticFiles
+
+# Serve static audio files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Configure CORS — allow localhost for dev and the Vercel frontend host
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://jlpt-platform.vercel.app",
+    "https://jlpt-mock-test.vercel.app",
+]
+
+frontend_url = os.getenv("FRONTEND_URL", "").strip()
+if frontend_url:
+    origins.append(frontend_url)
+
+# Add a permissive pattern for any Vercel preview branch
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the JLPT N4 API"}
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy"}
+
+# Register routers
+app.include_router(exam.router, prefix="/api/tests", tags=["Exam Engine"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin Panel"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

@@ -1,0 +1,551 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.platform{display:grid;grid-template-columns:200px 1fr;min-height:600px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.sidebar{background:var(--color-background-secondary);border-right:0.5px solid var(--color-border-tertiary);padding:1rem 0}
+.sidebar-logo{padding:0 1rem 1rem;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:0.75rem}
+.sidebar-logo p{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.sidebar-logo span{font-size:11px;color:var(--color-text-secondary)}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 1rem;font-size:13px;cursor:pointer;color:var(--color-text-secondary);border-radius:0;transition:all .15s}
+.nav-item:hover{background:var(--color-background-primary);color:var(--color-text-primary)}
+.nav-item.active{background:var(--color-background-primary);color:var(--color-text-info);font-weight:500;border-left:2px solid var(--color-border-info);border-radius:0}
+.nav-item i{font-size:16px}
+.nav-section{padding:8px 1rem 4px;font-size:11px;text-transform:uppercase;color:var(--color-text-tertiary);letter-spacing:.5px;margin-top:8px}
+.main{padding:1.5rem;overflow:hidden}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:18px;font-weight:500;margin-bottom:4px}
+.page-sub{font-size:12px;color:var(--color-text-secondary);margin-bottom:1.5rem}
+.level-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.5rem}
+.level-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:12px;cursor:pointer;transition:all .15s;background:var(--color-background-primary)}
+.level-card:hover{border-color:var(--color-border-primary)}
+.level-card.sel{border-width:2px}
+.level-badge{font-size:18px;font-weight:500;margin-bottom:4px}
+.level-desc{font-size:10px;color:var(--color-text-secondary);line-height:1.4}
+.level-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pill{font-size:10px;padding:2px 6px;border-radius:3px}
+.lv-n5 .level-badge{color:#1D9E75} .lv-n5.sel{border-color:#1D9E75} .lv-n5 .pill{background:#E1F5EE;color:#085041}
+.lv-n4 .level-badge{color:#378ADD} .lv-n4.sel{border-color:#378ADD} .lv-n4 .pill{background:#E6F1FB;color:#0C447C}
+.lv-n3 .level-badge{color:#BA7517} .lv-n3.sel{border-color:#BA7517} .lv-n3 .pill{background:#FAEEDA;color:#633806}
+.lv-n2 .level-badge{color:#D4537E} .lv-n2.sel{border-color:#D4537E} .lv-n2 .pill{background:#FBEAF0;color:#72243E}
+.lv-n1 .level-badge{color:#534AB7} .lv-n1.sel{border-color:#534AB7} .lv-n1 .pill{background:#EEEDFE;color:#3C3489}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem}
+.stat{background:var(--color-background-secondary);padding:10px;border-radius:var(--border-radius-md);text-align:center}
+.stat-n{font-size:22px;font-weight:500}
+.stat-l{font-size:11px;color:var(--color-text-secondary);text-transform:uppercase;margin-top:2px}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:13px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+label{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+select,input,textarea{width:100%;padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px;background:var(--color-background-primary);color:var(--color-text-primary)}
+textarea{resize:vertical;font-family:var(--font-sans)}
+.btn{padding:7px 14px;border-radius:var(--border-radius-md);font-size:13px;font-weight:500;cursor:pointer;border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);transition:all .15s}
+.btn:hover{background:var(--color-background-secondary)}
+.btn.primary{background:#534AB7;color:#EEEDFE;border-color:#534AB7}
+.btn.primary:hover{background:#3C3489}
+.btn.success{background:#0F6E56;color:#E1F5EE;border-color:#0F6E56}
+.btn-row{display:flex;gap:8px;margin-top:12px;align-items:center}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:500}
+.badge-info{background:var(--color-background-info);color:var(--color-text-info)}
+.badge-warn{background:var(--color-background-warning);color:var(--color-text-warning)}
+.badge-ok{background:var(--color-background-success);color:var(--color-text-success)}
+.badge-purp{background:#EEEDFE;color:#3C3489}
+.q-preview{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px;margin-top:8px}
+.q-preview-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.q-text-p{font-size:13px;margin-bottom:8px;line-height:1.5}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opt{font-size:12px;padding:6px 8px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary)}
+.opt.correct{border-color:#1D9E75;background:#E1F5EE;color:#085041;font-weight:500}
+.audio-box{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;margin-bottom:10px}
+.audio-player{display:flex;align-items:center;gap:10px;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);padding:8px 12px;border-radius:var(--border-radius-md);margin-top:8px}
+.play-btn{width:32px;height:32px;border-radius:50%;background:#534AB7;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#EEEDFE;font-size:14px}
+.progress-bar{flex:1;height:4px;background:var(--color-border-tertiary);border-radius:2px;position:relative}
+.progress-fill{width:0%;height:100%;background:#534AB7;border-radius:2px;transition:width .3s}
+.wave{display:flex;align-items:center;gap:2px;height:20px}
+.wave-bar{width:3px;border-radius:2px;background:#534AB7;animation:wave 0.8s ease-in-out infinite}
+.wave-bar:nth-child(2){animation-delay:.1s;height:14px}
+.wave-bar:nth-child(3){animation-delay:.2s;height:18px}
+.wave-bar:nth-child(4){animation-delay:.3s;height:10px}
+.wave-bar:nth-child(5){animation-delay:.4s;height:16px}
+@keyframes wave{0%,100%{transform:scaleY(.6)}50%{transform:scaleY(1)}}
+.wave-bar{height:8px}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info p{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.toggle-info span{font-size:11px;color:var(--color-text-secondary)}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--color-border-secondary);border-radius:10px;cursor:pointer;transition:.2s}
+.slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s}
+.toggle input:checked + .slider{background:#534AB7}
+.toggle input:checked + .slider:before{transform:translateX(16px)}
+.step-flow{display:flex;gap:0;margin-bottom:1.5rem;overflow:hidden;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg)}
+.step{flex:1;padding:10px 8px;text-align:center;border-right:0.5px solid var(--color-border-tertiary);cursor:pointer;font-size:11px;color:var(--color-text-secondary);transition:all .15s}
+.step:last-child{border-right:none}
+.step.done{background:var(--color-background-success);color:#085041}
+.step.active{background:#EEEDFE;color:#3C3489;font-weight:500}
+.step i{display:block;font-size:16px;margin-bottom:3px}
+.sim-result{border-left:3px solid #534AB7;padding:10px 12px;background:#EEEDFE;border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;font-size:12px;color:#3C3489;margin-top:8px}
+</style>
+<h2 class="sr-only">Interactive JLPT platform demo covering levels N5 through N1, AI question generation, listening module, and modular settings.</h2>
+
+<div class="platform">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <p>JLPT Platform</p>
+      <span>Teacher Dashboard</span>
+    </div>
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" onclick="showPage('overview')"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview</div>
+    <div class="nav-item" onclick="showPage('qgen')"><i class="ti ti-sparkles" aria-hidden="true"></i> AI Question Gen</div>
+    <div class="nav-item" onclick="showPage('listening')"><i class="ti ti-headphones" aria-hidden="true"></i> AI Listening Gen</div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-item" onclick="showPage('modules')"><i class="ti ti-toggle-left" aria-hidden="true"></i> Module Settings</div>
+    <div class="nav-item" onclick="showPage('levels')"><i class="ti ti-certificate" aria-hidden="true"></i> Level Config</div>
+  </div>
+
+  <div class="main">
+
+    <div class="page active" id="page-overview">
+      <div class="page-title">Platform Overview</div>
+      <div class="page-sub">Full JLPT mock test platform — N5 to N1</div>
+      <div class="level-grid">
+        <div class="level-card lv-n5 sel" onclick="selectLevel(this,'N5')">
+          <div class="level-badge">N5</div>
+          <div class="level-desc">Beginner · 150 Q bank</div>
+          <div class="level-pills"><span class="pill">Kanji</span><span class="pill">Vocab</span><span class="pill">Grammar</span><span class="pill">Listen</span></div>
+        </div>
+        <div class="level-card lv-n4" onclick="selectLevel(this,'N4')">
+          <div class="level-badge">N4</div>
+          <div class="level-desc">Elementary · 300 Q bank</div>
+          <div class="level-pills"><span class="pill">Kanji</span><span class="pill">Vocab</span><span class="pill">Grammar</span><span class="pill">Listen</span></div>
+        </div>
+        <div class="level-card lv-n3" onclick="selectLevel(this,'N3')">
+          <div class="level-badge">N3</div>
+          <div class="level-desc">Intermediate · 500 Q bank</div>
+          <div class="level-pills"><span class="pill">Kanji</span><span class="pill">Vocab</span><span class="pill">Grammar</span><span class="pill">Read</span><span class="pill">Listen</span></div>
+        </div>
+        <div class="level-card lv-n2" onclick="selectLevel(this,'N2')">
+          <div class="level-badge">N2</div>
+          <div class="level-desc">Advanced · 700 Q bank</div>
+          <div class="level-pills"><span class="pill">Vocab</span><span class="pill">Grammar</span><span class="pill">Read</span><span class="pill">Listen</span></div>
+        </div>
+        <div class="level-card lv-n1" onclick="selectLevel(this,'N1')">
+          <div class="level-badge">N1</div>
+          <div class="level-desc">Expert · 1000 Q bank</div>
+          <div class="level-pills"><span class="pill">Grammar</span><span class="pill">Read</span><span class="pill">Listen</span></div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n" id="ov-q">150</div><div class="stat-l">Questions</div></div>
+        <div class="stat"><div class="stat-n" id="ov-t">120</div><div class="stat-l">Test mins</div></div>
+        <div class="stat"><div class="stat-n" id="ov-s">4</div><div class="stat-l">Sections</div></div>
+        <div class="stat"><div class="stat-n" id="ov-p">100</div><div class="stat-l">Pass score</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-info-circle" style="font-size:16px;color:var(--color-text-info)" aria-hidden="true"></i> Selected level: <span id="sel-level-name">N5</span></div>
+        <div id="level-detail" style="font-size:13px;color:var(--color-text-secondary);line-height:1.7">N5 is the most basic level of the JLPT. Students learn hiragana, katakana, ~100 kanji, basic grammar patterns, and everyday vocabulary. Test has 4 sections: 文字・語彙, 文法, 読解, and 聴解.</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-qgen">
+      <div class="page-title">AI question generator</div>
+      <div class="page-sub">Bulk-create questions for any JLPT level in seconds</div>
+
+      <div class="step-flow">
+        <div class="step done" id="s1"><i class="ti ti-upload" aria-hidden="true"></i>1. Input</div>
+        <div class="step active" id="s2"><i class="ti ti-settings" aria-hidden="true"></i>2. Configure</div>
+        <div class="step" id="s3"><i class="ti ti-eye" aria-hidden="true"></i>3. Preview</div>
+        <div class="step" id="s4"><i class="ti ti-download" aria-hidden="true"></i>4. Export</div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <div class="card">
+            <div class="card-title"><i class="ti ti-notes" aria-hidden="true" style="font-size:16px"></i> Content input</div>
+            <label>JLPT Level</label>
+            <select id="gen-level" onchange="updateGenLevel()" style="margin-bottom:10px">
+              <option>N5</option><option>N4</option><option>N3</option><option>N2</option><option>N1</option>
+            </select>
+            <label>Section type</label>
+            <select id="gen-section" style="margin-bottom:10px">
+              <option>文字・語彙 (Vocabulary)</option>
+              <option>文法 (Grammar)</option>
+              <option>読解 (Reading)</option>
+              <option>聴解 (Listening)</option>
+            </select>
+            <label>Paste your syllabus content</label>
+            <textarea rows="4" placeholder="Example for N5 Vocab:&#10;水 (みず) water&#10;山 (やま) mountain&#10;食べる (たべる) to eat&#10;先生 (せんせい) teacher"></textarea>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title"><i class="ti ti-adjustments" aria-hidden="true" style="font-size:16px"></i> Generation settings</div>
+            <div class="row2" style="margin-bottom:10px">
+              <div>
+                <label>Number of questions</label>
+                <input type="number" value="30" min="5" max="500" id="qcount" oninput="updateQCount()">
+              </div>
+              <div>
+                <label>Difficulty</label>
+                <select>
+                  <option>Auto-balanced</option>
+                  <option>Easy only</option>
+                  <option>Hard only</option>
+                </select>
+              </div>
+            </div>
+            <label>Question types to mix</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+              <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--color-text-primary)"><input type="checkbox" checked style="width:auto"> MCQ (4 options)</label>
+              <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--color-text-primary)"><input type="checkbox" checked style="width:auto"> Fill in the blank</label>
+              <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--color-text-primary)"><input type="checkbox" style="width:auto"> Reading passage</label>
+            </div>
+            <div class="btn-row">
+              <button class="btn primary" onclick="runGenDemo()"><i class="ti ti-sparkles" style="margin-right:4px" aria-hidden="true"></i>Generate <span id="qcount-label">30</span> questions</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="gen-result" style="display:none">
+        <div class="sim-result"><i class="ti ti-check" aria-hidden="true"></i> AI generated <strong id="gen-num"></strong> questions in 18 seconds. Here is a preview:</div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="q-preview">
+            <div class="q-preview-head"><span style="font-size:11px;color:var(--color-text-secondary)">Q1 · MCQ · Easy</span><span class="badge badge-ok">文字・語彙</span></div>
+            <div class="q-text-p" id="gen-q1">「水」の読み方はどれですか？</div>
+            <div class="opts">
+              <div class="opt correct">A) みず</div><div class="opt">B) やま</div>
+              <div class="opt">C) かわ</div><div class="opt">D) うみ</div>
+            </div>
+          </div>
+          <div class="q-preview">
+            <div class="q-preview-head"><span style="font-size:11px;color:var(--color-text-secondary)">Q2 · Fill-blank · Medium</span><span class="badge badge-warn">文法</span></div>
+            <div class="q-text-p" id="gen-q2">私は毎朝ご飯を ___。</div>
+            <div class="opts">
+              <div class="opt correct">A) 食べます</div><div class="opt">B) 食べる</div>
+              <div class="opt">C) 食べた</div><div class="opt">D) 食べて</div>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn">Regenerate selected</button>
+          <button class="btn success"><i class="ti ti-download" style="margin-right:4px" aria-hidden="true"></i>Export all</button>
+          <button class="btn" onclick="sendPrompt('Tell me more about exporting generated JLPT questions')">More export options ↗</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-listening">
+      <div class="page-title">AI listening generator <span class="badge badge-purp" style="font-size:11px;vertical-align:middle;margin-left:6px">聴解 Choukai</span></div>
+      <div class="page-sub">Paste a dialogue or script — AI generates audio + comprehension questions automatically</div>
+
+      <div class="step-flow">
+        <div class="step done" id="ls1"><i class="ti ti-script" aria-hidden="true"></i>1. Script</div>
+        <div class="step active" id="ls2"><i class="ti ti-microphone" aria-hidden="true"></i>2. Voice</div>
+        <div class="step" id="ls3"><i class="ti ti-headphones" aria-hidden="true"></i>3. Audio</div>
+        <div class="step" id="ls4"><i class="ti ti-list-check" aria-hidden="true"></i>4. Questions</div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <div class="card">
+            <div class="card-title"><i class="ti ti-script" aria-hidden="true" style="font-size:16px"></i> Listening script</div>
+            <label>JLPT level</label>
+            <select style="margin-bottom:10px" id="lst-level">
+              <option>N5 — Simple conversations</option>
+              <option>N4 — Daily situations</option>
+              <option>N3 — Announcements & dialogues</option>
+              <option>N2 — News & discussions</option>
+              <option>N1 — Complex monologues</option>
+            </select>
+            <label>Script / Dialogue</label>
+            <textarea id="lst-script" rows="6" placeholder="Paste your dialogue here...&#10;&#10;Example (N5):&#10;A: すみません、駅はどこですか？&#10;B: あそこです。まっすぐ行って、&#10;   右に曲がってください。&#10;A: ありがとうございます。"></textarea>
+            <div style="margin-top:8px;padding:8px;background:var(--color-background-warning);border-radius:var(--border-radius-md)">
+              <span style="font-size:11px;color:var(--color-text-warning)"><i class="ti ti-info-circle" aria-hidden="true"></i> Students will HEAR this but NOT see it during the exam.</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title"><i class="ti ti-microphone" aria-hidden="true" style="font-size:16px"></i> AI voice settings</div>
+            <label>Speaker count</label>
+            <select id="speaker-count" style="margin-bottom:10px">
+              <option>1 speaker (monologue)</option>
+              <option>2 speakers (dialogue)</option>
+              <option>Group (3+ speakers)</option>
+            </select>
+            <label>Voice gender</label>
+            <select style="margin-bottom:10px">
+              <option>Female (standard JLPT style)</option>
+              <option>Male</option>
+              <option>Mixed (A=female, B=male)</option>
+            </select>
+            <label>Speech speed</label>
+            <select style="margin-bottom:10px">
+              <option>Standard</option>
+              <option>Slow (N5/N4 friendly)</option>
+              <option>Fast (N1/N2 challenge)</option>
+            </select>
+            <label>Questions to generate</label>
+            <input type="number" value="5" min="1" max="20" style="margin-bottom:10px">
+            <div class="btn-row">
+              <button class="btn primary" onclick="runListenDemo()"><i class="ti ti-wand" style="margin-right:4px" aria-hidden="true"></i>Generate audio + questions</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="listen-result" style="display:none">
+        <div class="sim-result" style="margin-bottom:12px"><i class="ti ti-check" aria-hidden="true"></i> AI generated audio and 5 listening questions successfully.</div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-headphones" aria-hidden="true" style="font-size:16px"></i> Generated audio</div>
+          <div class="audio-box">
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Track 1 · N5 Dialogue · 00:28</div>
+            <div class="audio-player">
+              <button class="play-btn" onclick="togglePlay(this)" aria-label="Play audio"><i class="ti ti-player-play" id="play-icon" aria-hidden="true"></i></button>
+              <div class="wave" id="wave-vis" style="display:none">
+                <div class="wave-bar" style="height:8px"></div>
+                <div class="wave-bar" style="height:14px"></div>
+                <div class="wave-bar" style="height:18px"></div>
+                <div class="wave-bar" style="height:10px"></div>
+                <div class="wave-bar" style="height:16px"></div>
+              </div>
+              <div class="progress-bar" id="prog-bar" style="display:block"><div class="progress-fill" id="prog-fill"></div></div>
+              <span style="font-size:12px;color:var(--color-text-secondary)" id="time-label">00:00</span>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--color-text-secondary);text-transform:uppercase">Generated questions</div>
+            <div class="q-preview" style="margin-bottom:8px">
+              <div class="q-preview-head"><span style="font-size:11px;color:var(--color-text-secondary)">Q1 · Listening · N5</span><span class="badge badge-purp">聴解</span></div>
+              <div class="q-text-p">この会話は何についてですか？</div>
+              <div class="opts">
+                <div class="opt correct">A) 駅への道案内</div><div class="opt">B) 電車の時刻</div>
+                <div class="opt">C) 買い物の場所</div><div class="opt">D) 学校の場所</div>
+              </div>
+            </div>
+            <div class="q-preview">
+              <div class="q-preview-head"><span style="font-size:11px;color:var(--color-text-secondary)">Q2 · Listening · N5</span><span class="badge badge-purp">聴解</span></div>
+              <div class="q-text-p">駅に行くにはどうすればいいですか？</div>
+              <div class="opts">
+                <div class="opt correct">A) まっすぐ行って右に曲がる</div><div class="opt">B) 左に曲がる</div>
+                <div class="opt">C) 地下鉄に乗る</div><div class="opt">D) バスで行く</div>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn">Regenerate questions</button>
+            <button class="btn success"><i class="ti ti-download" style="margin-right:4px" aria-hidden="true"></i>Download audio + questions</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-modules">
+      <div class="page-title">Module settings</div>
+      <div class="page-sub">Turn any feature on or off — full control for teachers</div>
+
+      <div class="card">
+        <div class="card-title"><i class="ti ti-puzzle" style="font-size:16px" aria-hidden="true"></i> Question modules</div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>文字・語彙 (Vocabulary)</p><span>Kanji reading, word meaning, word usage</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>文法 (Grammar)</p><span>Sentence patterns, conjugation, particles</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>読解 (Reading comprehension)</p><span>Passages, emails, notices — N3 and above</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>聴解 (Listening)</p><span>AI-generated audio + comprehension questions</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="ti ti-sparkles" style="font-size:16px" aria-hidden="true"></i> AI generation features</div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Bulk question generator</p><span>Generate 5–500 questions from syllabus content</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>AI listening voice engine</p><span>Text-to-speech with JLPT-style narration</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Auto answer key + explanations</p><span>Generates why each answer is correct</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Difficulty auto-balancer</p><span>30% easy / 50% medium / 20% hard distribution</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Duplicate prevention</p><span>Ensures no two questions are the same</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="ti ti-school" style="font-size:16px" aria-hidden="true"></i> Student experience features</div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Real exam timer</p><span>Countdown matching real JLPT time limits</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Score report with breakdown</p><span>Per-section results + pass/fail prediction</span></div>
+          <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Instant answer review</p><span>Students see correct answers after test ends</span></div>
+          <label class="toggle"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><p>Progress tracker (analytics)</p><span>Week-by-week improvement charts per student</span></div>
+          <label class="toggle"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-levels">
+      <div class="page-title">Level configuration</div>
+      <div class="page-sub">Customise time limits, pass marks, and section weights per level</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" id="lc-n5" style="border-left:3px solid #1D9E75;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+          <div class="card-title"><span style="color:#1D9E75;font-weight:500">N5</span> <span style="font-weight:400;color:var(--color-text-secondary)">— Beginner</span></div>
+          <div class="row3">
+            <div><label>Test duration</label><input type="number" value="110" style="width:100%"></div>
+            <div><label>Total questions</label><input type="number" value="72" style="width:100%"></div>
+            <div><label>Pass score (%)</label><input type="number" value="38" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="card" style="border-left:3px solid #378ADD;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+          <div class="card-title"><span style="color:#378ADD;font-weight:500">N4</span> <span style="font-weight:400;color:var(--color-text-secondary)">— Elementary</span></div>
+          <div class="row3">
+            <div><label>Test duration</label><input type="number" value="110" style="width:100%"></div>
+            <div><label>Total questions</label><input type="number" value="72" style="width:100%"></div>
+            <div><label>Pass score (%)</label><input type="number" value="38" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="card" style="border-left:3px solid #BA7517;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+          <div class="card-title"><span style="color:#BA7517;font-weight:500">N3</span> <span style="font-weight:400;color:var(--color-text-secondary)">— Intermediate</span></div>
+          <div class="row3">
+            <div><label>Test duration</label><input type="number" value="140" style="width:100%"></div>
+            <div><label>Total questions</label><input type="number" value="95" style="width:100%"></div>
+            <div><label>Pass score (%)</label><input type="number" value="38" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="card" style="border-left:3px solid #D4537E;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+          <div class="card-title"><span style="color:#D4537E;font-weight:500">N2</span> <span style="font-weight:400;color:var(--color-text-secondary)">— Advanced</span></div>
+          <div class="row3">
+            <div><label>Test duration</label><input type="number" value="155" style="width:100%"></div>
+            <div><label>Total questions</label><input type="number" value="90" style="width:100%"></div>
+            <div><label>Pass score (%)</label><input type="number" value="50" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="card" style="border-left:3px solid #534AB7;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+          <div class="card-title"><span style="color:#534AB7;font-weight:500">N1</span> <span style="font-weight:400;color:var(--color-text-secondary)">— Expert</span></div>
+          <div class="row3">
+            <div><label>Test duration</label><input type="number" value="170" style="width:100%"></div>
+            <div><label>Total questions</label><input type="number" value="90" style="width:100%"></div>
+            <div><label>Pass score (%)</label><input type="number" value="50" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:1rem">
+        <button class="btn primary">Save all level settings</button>
+        <button class="btn">Reset to JLPT defaults</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const levelData = {
+  N5:{q:150,t:110,s:4,p:100,desc:'N5 is the most basic level of the JLPT. Students learn hiragana, katakana, ~100 kanji, basic grammar patterns, and everyday vocabulary. Test has 4 sections: 文字・語彙, 文法, 読解, and 聴解.'},
+  N4:{q:300,t:110,s:4,p:90,desc:'N4 covers approximately 300 kanji and 1,500 vocabulary words. Students can understand basic conversations on daily topics. Includes all 4 sections with longer reading passages than N5.'},
+  N3:{q:500,t:140,s:5,p:95,desc:'N3 is the intermediate bridge between basic and high-level Japanese. Covers ~650 kanji, 3,750 vocabulary words. Introduces longer 読解 passages and more complex 聴解 scenarios.'},
+  N2:{q:700,t:155,s:5,p:90,desc:'N2 requires high proficiency. Covers ~1,000 kanji and 6,000 vocabulary words. Reading sections include news articles, explanatory texts. Listening includes complex discussions.'},
+  N1:{q:1000,t:170,s:5,p:100,desc:'N1 is the highest JLPT level. Covers ~2,000 kanji and 10,000 vocabulary words. Reading includes abstract and complex materials. Listening covers natural-speed speech, debates, and lectures.'}
+};
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function selectLevel(el,lv){
+  document.querySelectorAll('.level-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const d=levelData[lv];
+  document.getElementById('ov-q').textContent=d.q;
+  document.getElementById('ov-t').textContent=d.t;
+  document.getElementById('ov-s').textContent=d.s;
+  document.getElementById('ov-p').textContent=d.p;
+  document.getElementById('sel-level-name').textContent=lv;
+  document.getElementById('level-detail').textContent=d.desc;
+}
+
+function updateQCount(){
+  document.getElementById('qcount-label').textContent=document.getElementById('qcount').value;
+}
+
+function runGenDemo(){
+  const lvl=document.getElementById('gen-level').value;
+  const q1s={N5:'「水」の読み方はどれですか？',N4:'「電車」の意味はどれですか？',N3:'「環境」を正しく使った文はどれですか？',N2:'この文の下線部と同じ意味はどれですか？',N1:'この文の「ものの」はどんな意味ですか？'};
+  document.getElementById('gen-q1').textContent=q1s[lvl]||q1s.N5;
+  document.getElementById('gen-num').textContent=document.getElementById('qcount').value;
+  document.getElementById('gen-result').style.display='block';
+  ['s1','s2','s3'].forEach(s=>{document.getElementById(s).className='step done';});
+  document.getElementById('s4').className='step active';
+}
+
+function runListenDemo(){
+  document.getElementById('listen-result').style.display='block';
+  ['ls1','ls2','ls3'].forEach(s=>{document.getElementById(s).className='step done';});
+  document.getElementById('ls4').className='step active';
+}
+
+let playing=false, timer=null, secs=0;
+function togglePlay(btn){
+  playing=!playing;
+  const icon=document.getElementById('play-icon');
+  const wave=document.getElementById('wave-vis');
+  const bar=document.getElementById('prog-bar');
+  if(playing){
+    icon.className='ti ti-player-pause';
+    wave.style.display='flex';
+    bar.style.display='none';
+    timer=setInterval(()=>{
+      secs++;
+      const pct=Math.min((secs/28)*100,100);
+      document.getElementById('prog-fill').style.width=pct+'%';
+      const m=Math.floor(secs/60).toString().padStart(2,'0');
+      const s=(secs%60).toString().padStart(2,'0');
+      document.getElementById('time-label').textContent=m+':'+s;
+      if(secs>=28){clearInterval(timer);playing=false;icon.className='ti ti-player-play';wave.style.display='none';bar.style.display='block';secs=0;}
+    },1000);
+  } else {
+    icon.className='ti ti-player-play';
+    wave.style.display='none';
+    bar.style.display='block';
+    clearInterval(timer);
+  }
+}
+
+function updateGenLevel(){
+  const v=document.getElementById('gen-level').value;
+  const sec=document.getElementById('gen-section');
+  if(v==='N5'||v==='N4'){sec.options[2].text='読解 (Reading) — basic';}
+  else if(v==='N3'){sec.options[2].text='読解 (Reading) — intermediate';}
+  else{sec.options[2].text='読解 (Reading) — advanced';}
+}
+</script>

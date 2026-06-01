@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://jlpt-platform-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/static/:path*",
+      "destination": "https://jlpt-platform-backend.onrender.com/static/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
