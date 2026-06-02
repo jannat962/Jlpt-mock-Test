@@ -208,11 +208,11 @@ def update_test(test_id: int, test_update: schemas.MockTestCreate, teacher: mode
     
     # Update questions: Clear and recreate for simplicity
     # Manual cleanup of dependent answers to avoid foreign key violations
-    db.query(models.UserAnswer).filter(models.UserAnswer.question_id.in_(
-        db.query(models.Question.id).filter(models.Question.test_id == test_id)
-    )).delete(synchronize_session=False)
+    q_ids = [q.id for q in db.query(models.Question).filter(models.Question.test_id == test_id).all()]
+    if q_ids:
+        db.query(models.UserAnswer).filter(models.UserAnswer.question_id.in_(q_ids)).delete(synchronize_session=False)
     
-    db.query(models.Question).filter(models.Question.test_id == test_id).delete()
+    db.query(models.Question).filter(models.Question.test_id == test_id).delete(synchronize_session=False)
     
     for q in test_update.questions:
         db_q = models.Question(
