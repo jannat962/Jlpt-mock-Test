@@ -2148,6 +2148,9 @@ function App() {
   useEffect(() => {
     // Apply persisted preference on mount
     applyTextSize(textSize);
+    
+    // Warm up the Render backend immediately on page load (pre-wakes free tier from sleep)
+    fetch(`${API_URL}/health`).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
