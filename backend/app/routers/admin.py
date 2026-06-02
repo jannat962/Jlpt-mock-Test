@@ -182,6 +182,9 @@ def create_test(test: schemas.MockTestCreate, teacher: models.User = Depends(req
             question_text=q.question_text,
             options=q.options,
             correct_index=q.correct_index,
+            difficulty=q.difficulty,
+            explanation=q.explanation,
+            tags=q.tags,
             audio_url=q.audio_url,
             image_url=q.image_url
         )
@@ -220,6 +223,9 @@ def update_test(test_id: int, test_update: schemas.MockTestCreate, teacher: mode
             question_text=q.question_text,
             options=q.options,
             correct_index=q.correct_index,
+            difficulty=q.difficulty,
+            explanation=q.explanation,
+            tags=q.tags,
             audio_url=q.audio_url,
             image_url=q.image_url
         )
