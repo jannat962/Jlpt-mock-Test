@@ -78,15 +78,23 @@ If you get a **404** or timeout:
 
 1. Go to [https://vercel.com](https://vercel.com)
 2. Import your GitHub repo
-3. Configure as follows:
-   - **Framework**: Vite
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
+3. Configure the deployment settings. You can use either of these directory setups:
+   * **Option A: Deploying with Root Directory set to `frontend` (Recommended)**:
+     * **Root Directory**: `frontend`
+     * **Framework**: Vite
+     * **Build Command**: `npm run build`
+     * **Output Directory**: `dist`
+     * *(Vercel will use the `frontend/vercel.json` we created to correctly proxy `/api/*` requests).*
+   * **Option B: Deploying with Root Directory set to `.` (Repository Root)**:
+     * **Root Directory**: `.`
+     * **Framework**: Vite
+     * **Build Command**: `npm install --prefix frontend && npm run build --prefix frontend`
+     * **Output Directory**: `frontend/dist`
+     * *(Vercel will use the root `vercel.json` to proxy `/api/*` requests).*
 
 4. Click **"Deploy"**
 
-Vercel will automatically rewrite `/api/*` requests to your Render backend based on `vercel.json`.
+Vercel will automatically route `/api/*` requests to your Render backend based on the corresponding `vercel.json`.
 
 ---
 
