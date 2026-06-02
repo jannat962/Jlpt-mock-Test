@@ -127,6 +127,9 @@ def sync_postgres_sequence(conn, table, column):
         print(f"[STARTUP] Could not sync sequence for {table}.{column}: {exc}")
 
 def sync_sequences():
+    if "postgresql" not in engine.url.drivername:
+        print("[STARTUP] Database is not PostgreSQL; skipping sequence synchronization.")
+        return
     with engine.begin() as conn:
         for table, column in [
             ('mock_tests', 'id'),
