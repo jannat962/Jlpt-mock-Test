@@ -1,14 +1,12 @@
 {
-  "version": 2,
-  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://jlpt-mock-test-1.onrender.com/api/:path*"
+      "destination": "https://jlpt-mock-test-ugp3.onrender.com/api/:path*"
     },
     {
       "source": "/static/:path*",
-      "destination": "https://jlpt-mock-test-1.onrender.com/static/:path*"
+      "destination": "https://jlpt-mock-test-ugp3.onrender.com/static/:path*"
     },
     {
       "source": "/(.*)",
