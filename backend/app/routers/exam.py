@@ -34,7 +34,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-@router.get("/", response_model=List[schemas.MockTestResponse])
+@router.get("", response_model=List[schemas.MockTestResponse])
 def list_available_tests(current_user: int = Depends(get_current_user), db: Session = Depends(get_db)):
     """List all available mock tests for learners."""
     return db.query(models.MockTest).all()

@@ -2203,7 +2203,7 @@ function App() {
   const fetchTests = async () => {
     if (!token) return;
     try {
-      const endpoint = user?.role === 'teacher' ? `${API_URL}/admin/` : `${API_URL}/tests/`;
+      const endpoint = user?.role === 'teacher' ? `${API_URL}/admin` : `${API_URL}/tests`;
       const res = await fetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -2219,7 +2219,7 @@ function App() {
   const fetchMetrics = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_URL}/exam/metrics`, {
+      const res = await fetch(`${API_URL}/tests/metrics`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -2418,7 +2418,7 @@ function App() {
   const saveTest = async () => {
     try {
       const method = editingTest.id ? 'PUT' : 'POST';
-      const url = editingTest.id ? `${API_URL}/admin/${editingTest.id}` : `${API_URL}/admin/`;
+      const url = editingTest.id ? `${API_URL}/admin/${editingTest.id}` : `${API_URL}/admin`;
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

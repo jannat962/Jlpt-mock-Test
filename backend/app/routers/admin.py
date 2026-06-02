@@ -154,12 +154,12 @@ def require_teacher_role(current_user: int = Depends(get_current_user), db: Sess
 
 # --- Mock Test Management ---
 
-@router.get("/", response_model=List[schemas.MockTestResponse])
+@router.get("", response_model=List[schemas.MockTestResponse])
 def list_tests(teacher: models.User = Depends(require_teacher_role), db: Session = Depends(get_db)):
     """List all tests (teacher only)"""
     return db.query(models.MockTest).all()
 
-@router.post("/", response_model=schemas.MockTestResponse)
+@router.post("", response_model=schemas.MockTestResponse)
 def create_test(test: schemas.MockTestCreate, teacher: models.User = Depends(require_teacher_role), db: Session = Depends(get_db)):
     """Create a new test (teacher only)"""
     # 1. Create the MockTest
