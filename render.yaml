@@ -1,50 +1,56 @@
-# Render.yaml deployment configuration
-# Deploy this project to Render: https://render.com
-# Push to GitHub, then go to Render Dashboard > New > Web Service > Connect GitHub
+# Render.yaml – Infrastructure as Code for Jlpt-mock-Test backend
+# ---------------------------------------------------------------
+# This file lives at the repository root (Jlpt-mock-Test-main/)
 
 services:
-  - type: web
-    name: jlpt-platform-backend
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    
-    # Auto-restart on deployment
+  - type: web                     # FastAPI web service
+    name: Jlpt-mock-Test          # Must match Render service name
+    runtime: python               # Render will use the latest 3.x Python runtime
+    rootDir: backend               # Start in the ./backend directory
+    buildCommand: cd backend 2>/dev/null || true && pip install -r requirements.txt
+    # FastAPI entry point lives in backend/app/main.py
+    startCommand: cd backend 2>/dev/null || true && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # Auto‑restart on each new deploy
     autoDeploy: true
-    
-    # Environment variables
+
+    # -----------------------------------------------------------
+    # Environment variables – keep secrets out of the repo
+    # -----------------------------------------------------------
     envVars:
-      # Database connection (auto-linked from the PostgreSQL database below)
+      # Database – automatically linked (Render creates the DB for you)
       - key: DATABASE_URL
         fromDatabase:
           name: jlpt-db
           property: connectionString
-      
-      # JWT secret key (auto-generated securely by Render)
+
+      # JWT secret – Render will generate a random secret for you
       - key: SECRET_KEY
         generateValue: true
-      
-      # JWT algorithm
+
+      # JWT algorithm – static value
       - key: ALGORITHM
         value: HS256
-      
-      # Token expiration time
+
+      # Token expiry (minutes)
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 30
-      
-      # Frontend URL for CORS and callback configuration
+
+      # URL of your Vercel front‑end – used for CORS
       - key: FRONTEND_URL
         value: https://jlpt-mock-test.vercel.app
-      
-      # Suppress uv hardlink warning by using copy mode
+
+      # Render’s UV hard‑link warning workaround
       - key: UV_LINK_MODE
         value: copy
 
-# PostgreSQL Database
-# Renders free tier includes 1 PostgreSQL database
+      # ---- Add any additional secrets here ----
+      # Example (add via Render UI, **do not** commit real values):
+      # - key: OPENAI_API_KEY
+      #   value: <your‑key‑here>
+
 databases:
-  - name: jlpt-db
+  - name: jlpt-db                 # The Postgres DB Render creates
     databaseName: jlpt_n4_db
     user: jlpt_user
-    plan: free
+    plan: free                    # Free tier – sufficient for dev / demo

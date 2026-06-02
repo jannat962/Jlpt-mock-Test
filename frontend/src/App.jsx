@@ -20,6 +20,19 @@ const parseJsonResponse = async (res) => {
   throw new Error(`Unexpected API response (${res.status} ${res.statusText}): ${text.slice(0, 200)}`);
 };
 
+const getFriendlyApiError = (err) => {
+  const message = err?.message || 'An unexpected error occurred.';
+  if (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('No response body') ||
+    message.includes('404')
+  ) {
+    return 'The backend is unavailable or waking up. Please wait a moment and try again.';
+  }
+  return message;
+};
+
 // --- Error Boundary Component ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -2281,7 +2294,7 @@ function App() {
       alert('Account created! Please login.');
       setView('login');
     } catch (err) {
-      alert(err.message);
+      alert(getFriendlyApiError(err));
     } finally {
       setLoading(false);
     }
@@ -2314,7 +2327,7 @@ function App() {
       setUser(data.user);
       setView(data.user.role === 'teacher' ? 'admin-dashboard' : 'dashboard');
     } catch (err) {
-      alert(err.message);
+      alert(getFriendlyApiError(err));
     } finally {
       setLoading(false);
     }

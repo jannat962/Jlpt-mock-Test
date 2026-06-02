@@ -59,7 +59,7 @@ The backend will auto-redeploy. Wait for the status to show **"Live"**.
 
 Test your backend health check:
 ```bash
-curl https://jlpt-platform-backend.onrender.com/api/health
+curl https://jlpt-mock-test-6zdf.onrender.com/api/health
 ```
 
 Expected response:
@@ -168,5 +168,5 @@ If you deploy backend elsewhere (not Render):
 ## 📚 Links
 - Render Dashboard: https://dashboard.render.com
 - Vercel Dashboard: https://vercel.com/dashboard
-- Backend Health: https://jlpt-platform-backend.onrender.com/api/health
-- Frontend: https://jlpt-platform.vercel.app
+- Backend Health: https://jlpt-mock-test-6zdf.onrender.com/api/health
+- Frontend: https://jlpt-mock-test.vercel.app

@@ -9,7 +9,7 @@ load_dotenv()
 
 # Settings (Keep these in .env in production!)
 SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY or SECRET_KEY == "your-super-secret-key-change-this":
+if not SECRET_KEY or SECRET_KEY in ("your-super-secret-key-change-this", "change-me-to-a-random-secret-key"):
     raise ValueError(
         "CRITICAL: SECRET_KEY environment variable must be set to a strong random value. "
         "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
